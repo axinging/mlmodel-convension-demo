@@ -20,9 +20,15 @@ dummy_image = torch.tensor([[[[-1., -1., 1.],
           [1., 1., 1.],
           [1., 1., 1.]]]])
 
-print((MyModule()(dummy_image)))
+print("Result without eval: ",(MyModule()(dummy_image)))
+print('\n\nWeight and Bias parameters:')
 
 pytorch_module = MyModule().eval()
+for param in pytorch_module.parameters():
+    print(param)
+
+
+print(list(pytorch_module.parameters()))
 
 print("Input : ", str(dummy_image))
 print("Result : ", pytorch_module(dummy_image))
