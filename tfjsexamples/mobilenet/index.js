@@ -17,9 +17,9 @@
 
 //import {IMAGENET_CLASSES} from './imagenet_classes';
 
-const MOBILENET_MODEL_PATH =
+const MOBILENET_MODEL_PATH = './predict_pytorch2tfjs'
     // tslint:disable-next-line:max-line-length
-    'https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v2_100_224/classification/3/default/1';
+    //'https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v2_100_224/classification/3/default/1';
 
 const IMAGE_SIZE = 224;
 const TOPK_PREDICTIONS = 10;
@@ -33,7 +33,11 @@ const mobilenetDemo = async () => {
   // Warmup the model. This isn't necessary, but makes the first prediction
   // faster. Call `dispose` to release the WebGL memory allocated for the return
   // value of `predict`.
-  mobilenet.predict(tf.zeros([1, IMAGE_SIZE, IMAGE_SIZE, 3])).dispose();
+  var zerosInput = tf.zeros([1, IMAGE_SIZE, IMAGE_SIZE, 3])
+  console.log(zerosInput.shape);
+  zerosInput = zerosInput.transpose([0, 3, 1, 2]);
+  console.log(zerosInput.shape);
+  mobilenet.predict(zerosInput).dispose();
 
   status('');
 
@@ -74,10 +78,11 @@ async function predict(imgElement) {
     const normalized = img.sub(offset).div(offset);
 
     // Reshape to a single-element batch so we can pass it to predict.
-    const batched = normalized.reshape([1, IMAGE_SIZE, IMAGE_SIZE, 3]);
+    var batched = normalized.reshape([1, IMAGE_SIZE, IMAGE_SIZE, 3]);
 
     startTime2 = performance.now();
     // Make a prediction through mobilenet.
+    batched = batched.transpose([0, 3, 1, 2]);
     return mobilenet.predict(batched);
   });
 
