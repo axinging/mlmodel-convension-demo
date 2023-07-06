@@ -1,0 +1,32 @@
+<html>
+
+<head>
+  <title>TensorFlow.js demo</title>
+</head>
+
+<body>
+  <h2>TensorFlow.js demo</h2>
+  <script src="loader.js"></script>
+  <script>
+    'use strict';
+    const tensorflow_DataType_DT_INT32 = 3;
+
+    async function runTFJS() {
+      const model = await tf.loadGraphModel('./predict_pytorch2tfjs/model.json');
+      const input = tf.ones([1, 3, 224, 224], 'float32');
+      const output = model.predict(input);
+      console.log(JSON.stringify(await output.data()));
+    }
+
+    (async function () {
+      let localBuild = ['core', 'webgl', 'webgpu', 'tfjs-converter'];
+      await loadTFJS(localBuild);
+      await tf.setBackend('wasm');
+      await tf.ready();
+      tf.env().set('WEBGPU_CPU_FORWARD', false);
+      await runTFJS();
+    })();
+  </script>
+</body>
+
+</html>
