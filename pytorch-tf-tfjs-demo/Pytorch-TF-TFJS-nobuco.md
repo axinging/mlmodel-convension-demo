@@ -1,10 +1,10 @@
 
 
 
-# Pytorch model to TFJS model (code)
+# Pytorch model to TFJS model - simple example (code)
 
 
-### Step 1: Pytorch to Tensorflow
+### Step 1: Pytorch to Tensorflow (Code)
 
 Run nobuco-pt-tf-demo.py to convert pytorch model to tensorflow model.
 ```
@@ -44,11 +44,11 @@ print(type(keras_model))
 keras_model.save('./torch_keras')
 ```
 
-### Step 2: Tensorflow to TensorflowJS
+### Step 2: Tensorflow to TensorflowJS (File)
 
 tensorflowjs_converter --input_format=tf_saved_model ./ ./predict_houses_tfjs
 
-### Run TensorflowJS exmaple
+### Step 3: Run TensorflowJS exmaple
 
 ```
 <html>
@@ -81,4 +81,60 @@ tensorflowjs_converter --input_format=tf_saved_model ./ ./predict_houses_tfjs
   </script>
 </body>
 </html>
+```
+
+# Pytorch model to TFJS model - stable difussion - failed (File)
+
+### Step 1 : Save stable difussion pytorch model as pt file: 
+```
+from diffusers import StableDiffusionPipeline
+
+import torch
+
+pipe = StableDiffusionPipeline.from_pretrained("./stable-diffusion-v1-5")
+pipe = pipe.to("cpu")
+
+prompt = "a photo of an astronaut riding a horse on mars"
+#image = pipe(prompt).images[0]
+
+#image.save("astronaut_rides_horse.png")
+
+PATH_MODEL_ALL='torch_saved_model_all.pt'
+torch.save(pipe, PATH_MODEL_ALL)
+
+model = torch.load(PATH_MODEL_ALL)
+print(type(model))
+image = pipe(prompt).images[0]
+
+image.save("astronaut_rides_horse2.png")
+```
+### Step 2: Convert pt file as keras file (Failed): 
+
+As demostrated in sd-pytorch-save-load.py,  save the whole stable difussion as a pt then load, it works.
+But convert it to keras failed:
+
+```
+import nobuco
+from nobuco import ChannelOrder, ChannelOrderingStrategy
+from nobuco.layers.weight import WeightLayer
+import torch
+import torch.nn as nn
+import numpy as np
+
+dummy_image = torch.ones((1, 1, 3, 3))
+
+print("Input: "+ str(dummy_image))
+
+PATH_MODEL_ALL='torch_saved_model_all.pt'
+model = torch.load(PATH_MODEL_ALL)
+
+keras_model = nobuco.pytorch_to_keras(
+    model,
+    args=[dummy_image], kwargs=None,
+    inputs_channel_order=ChannelOrder.TENSORFLOW,
+    outputs_channel_order=ChannelOrder.TENSORFLOW
+)
+
+print(type(keras_model))
+keras_model.save('./torch_keras')
 ```
