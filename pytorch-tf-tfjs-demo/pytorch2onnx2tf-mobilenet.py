@@ -1,11 +1,5 @@
-
-from transformers import AutoTokenizer, CLIPTextModel
 import os
-
 import torch
-import nobuco
-from nobuco import ChannelOrder, ChannelOrderingStrategy
-from nobuco.layers.weight import WeightLayer
 import torch
 
 proxy = os.environ.get('http_proxy1')

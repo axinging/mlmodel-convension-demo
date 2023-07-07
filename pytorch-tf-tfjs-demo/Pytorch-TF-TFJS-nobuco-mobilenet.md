@@ -1,7 +1,7 @@
 
 
 
-# Pytorch model to TFJS model - simple example (code)
+# Pytorch model to TFJS model - mobilenetv2 (code)
 
 
 ### Step 1: Pytorch to Tensorflow (Code)
