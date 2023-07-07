@@ -53,7 +53,7 @@ model.eval()
 
 dummy_input = torch.randn(10, 3, 224, 224, device="cpu")
 
-ONNX_FILE = 'clip_text.onnx'
+ONNX_FILE = 'cliptext.onnx'
 #args=(temp['input_ids'], temp['attention_mask']),                   # model input (or a tuple for multiple inputs)
 # Export the model
 torch.onnx.export(model,               # model being run
@@ -66,3 +66,23 @@ torch.onnx.export(model,               # model being run
                   output_names = ['output'], # the model's output names
                   dynamic_axes={'input' : {0 : 'batch_size'},    # variable length axes
                                 'output' : {0 : 'batch_size'}})
+
+### ONNX2TF
+
+import onnx
+
+onnx_model = onnx.load(ONNX_FILE)
+onnx.checker.check_model(onnx_model)
+from onnx_tf.backend import prepare
+
+tfmodel = prepare(onnx_model)  # run the loaded model
+# https://stackoverflow.com/questions/60722008/is-there-any-way-to-convert-pytorch-tensor-to-tensorflow-tensor
+# output = tfmodel.run(input_batch)  # run the loaded model
+# np_tensor = pytorch_tensor.numpy()
+#tf_tensor = tf.convert_to_tensor(np_tensor)
+
+print("TFModel: ", type(tfmodel))
+# print("TF: ", output)
+# print("TF: ", type(output))
+
+tfmodel.export_graph("onnx2tf_cliptext_data")

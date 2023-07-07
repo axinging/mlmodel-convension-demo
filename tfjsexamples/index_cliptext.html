@@ -1,0 +1,38 @@
+<html>
+
+<head>
+  <title>TensorFlow.js demo</title>
+</head>
+
+<body>
+  <h2>TensorFlow.js demo</h2>
+  <!--script src="loader.js"></script-->
+  <script  src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.js"> </script>
+  <script>
+    'use strict';
+    async function runTFJS() {
+      const model = await tf.loadGraphModel('./predict_pytorch2tfjs_cliptext/model.json');
+      /*
+      {'input_ids': tensor([[49406,   320,  1125,   539,   320,  2368, 49407],
+        [49406,   320,  1125,   539,   320,  1929, 49407]]), 'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1]])}
+      */
+      const input = tf.ones([2, 7], 'int32');
+      const input2 = tf.ones([2, 7], 'int32');
+      // const output = model.predict([input, input2]);
+      const output = await model.executeAsync([input, input2]);
+      console.log(JSON.stringify(output));
+    }
+
+    (async function () {
+      let localBuild = ['core', 'webgl', 'webgpu', 'tfjs-converter'];
+      // await loadTFJS(localBuild);
+      await tf.setBackend('webgl');
+      await tf.ready();
+      //tf.env().set('WEBGPU_CPU_FORWARD', false);
+      await runTFJS();
+    })();
+  </script>
+</body>
+
+</html>
