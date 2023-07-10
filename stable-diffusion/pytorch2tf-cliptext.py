@@ -2,9 +2,8 @@ from transformers import AutoTokenizer, CLIPTextModel
 import os
 
 import torch
-#import nobuco
-#from nobuco import ChannelOrder, ChannelOrderingStrategy
-#from nobuco.layers.weight import WeightLayer
+
+### Load Pytorch model
 
 print(torch.__version__)
 
@@ -37,11 +36,11 @@ print(type(model))
 print(type(tokenizer))
 print(type(inputs))
 
-###
 #<class 'transformers.models.clip.modeling_clip.CLIPTextModel'>
 #<class 'transformers.models.clip.tokenization_clip_fast.CLIPTokenizerFast'>
 #<class 'transformers.tokenization_utils_base.BatchEncoding'>
-###
+
+###  Pytorch2ONNX
 
 pytorch_module = model
 
@@ -55,7 +54,6 @@ model.eval()
 dummy_input = torch.randn(10, 3, 224, 224, device="cpu")
 
 ONNX_FILE = 'cliptext.onnx'
-#args=(temp['input_ids'], temp['attention_mask']),                   # model input (or a tuple for multiple inputs)
 # Export the model
 torch.onnx.export(model,               # model being run
                   foo(**inputs),                  # model input (or a tuple for multiple inputs)

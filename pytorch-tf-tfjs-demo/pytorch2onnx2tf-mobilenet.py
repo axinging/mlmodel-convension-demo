@@ -9,6 +9,8 @@ os.environ['HTTP_PROXY'] = proxy
 os.environ['https_proxy'] = proxy
 os.environ['HTTPS_PROXY'] = proxy
 
+### Load Pytorch model
+
 model = torch.hub.load('pytorch/vision:v0.10.0', 'mobilenet_v2', pretrained=True)
 model.eval()
 
@@ -21,6 +23,7 @@ torch.save(pytorch_module, PATH_MODEL_ALL)
 
 model = torch.load(PATH_MODEL_ALL)
 model.eval()
+
 ###  Pytorch2ONNX
 
 import urllib
@@ -70,7 +73,5 @@ tfmodel = prepare(onnx_model)  # run the loaded model
 output = tfmodel.run(input_batch)  # run the loaded model
 
 print("TFModel: ", type(tfmodel))
-# print("TF: ", output)
-print("TF: ", type(output))
 
 tfmodel.export_graph("onnx_tf_data")
