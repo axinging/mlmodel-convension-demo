@@ -13,7 +13,7 @@ def getNPType(dataType):
     else:
         return np.float32
 
-def buildAndRunBinaryGraph(op, DATA_TYPE):
+def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
     NP_TYPE = getNPType(DATA_TYPE)
 
     t1 = np.array([4, 8, 9]).astype(NP_TYPE)
@@ -33,7 +33,7 @@ def buildAndRunBinaryGraph(op, DATA_TYPE):
     m1 = helper.make_model(g1, producer_name='onnxsub-demo')
     onnx.checker.check_model(m1)
     # Save the model
-    MODEL_NAME = op+'_'+type(DATA_TYPE).__name__+'.onnx'
+    MODEL_NAME = op+'_' + type(DATA_TYPE).__name__ +'_'+ comment +'.onnx'
     onnx.save(m1, MODEL_NAME)
     ort_sess = ort.InferenceSession(MODEL_NAME)
     outputs = ort_sess.run(None, {'a': t1, 'b': t2})
@@ -48,10 +48,10 @@ print('INT32', tp.INT32)
 print('UINT32', tp.UINT32)
 
 DATA_TYPE = tp.FLOAT
-buildAndRunBinaryGraph(op, DATA_TYPE)
+buildAndRunBinaryGraph(op, DATA_TYPE, 'FLOAT')
 
 DATA_TYPE = tp.INT32
-buildAndRunBinaryGraph(op, DATA_TYPE)
+buildAndRunBinaryGraph(op, DATA_TYPE, 'INT32')
 
 DATA_TYPE = tp.UINT32
-buildAndRunBinaryGraph(op, DATA_TYPE)
+buildAndRunBinaryGraph(op, DATA_TYPE, 'UINT32')
