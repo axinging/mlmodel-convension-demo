@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+    <header>
+        <title>ONNX Runtime JavaScript examples: Quick Start - Web (using bundler)</title>
+    </header>
+    <body>
+        <!-- consume a single file bundle -->
+        <script src="./node_modules/onnxruntime-web/dist/ort.webgpu.min.js"></script>
+        <script>
+        async function main() {
+            try {
+                // create a new session and load the specific model.
+                //
+                // the model in this example contains a single MatMul node
+                // it has 2 inputs: 'a'(float32, 3x4) and 'b'(float32, 4x3)
+                // it has 1 output: 'c'(float32, 3x3)
+                const session = await ort.InferenceSession.create('./sub.onnx',{executionProviders: ['webgpu']});
+
+                // prepare inputs. a tensor need its corresponding TypedArray as data
+                const dataB = Int32Array.from([1, 2, 3]);
+                const dataA = Int32Array.from([10, 20, 30]);
+                const tensorA = new ort.Tensor('int32', dataA, [3]);
+                const tensorB = new ort.Tensor('int32', dataB, [3]);
+
+                // prepare feeds. use model input names as keys.
+                const feeds = { a: tensorA, b: tensorB };
+
+                // feed inputs and run
+                const results = await session.run(feeds);
+
+                // read from results
+                const dataC = results.output.data;
+                console.log(`data of result tensor 'c': ${dataC}`);
+
+            } catch (e) {
+                console.error(`failed to inference ONNX model: ${e}.`);
+            }
+        }
+
+        main();
+        </script>
+    </body>
+</html>

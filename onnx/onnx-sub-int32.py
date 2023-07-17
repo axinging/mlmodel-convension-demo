@@ -11,7 +11,7 @@ def getNPType(dataType):
     else:
         return np.float32
 
-DATA_TYPE = tp.FLOAT
+DATA_TYPE = tp.INT32
 NP_TYPE = getNPType(DATA_TYPE)
 
 t1 = np.array([4,8, 9]).astype(NP_TYPE)
