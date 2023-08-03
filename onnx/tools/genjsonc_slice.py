@@ -105,5 +105,19 @@ def export_slice_default_axes(DATA_TYPE) -> None:
     caseInfo1 = {"inputs": [x, starts, ends], "outputs": outputs}
     createJsonFromTensors(opName + " with no attributes", opName, [caseInfo1], numpyTypeAsString(NP_TYPE))
 
-export_slice_default_axes(tp.FLOAT)
-export_slice_default_axes(tp.INT32)
+def genJsoncFomeOnnxFile(MODEL_NAME = "Sub_int_FLOAT.onnx"):
+    DATA_TYPE = tp.FLOAT
+    NP_TYPE = getNPType(DATA_TYPE)
+
+    a = np.random.randn(3).astype(NP_TYPE)
+    b = np.random.randn(3).astype(NP_TYPE)
+    ort_sess = ort.InferenceSession(MODEL_NAME)
+    outputs = ort_sess.run(None, {'a': a, 'b': b})
+    # Print Result
+    opName = "Sub"
+    caseInfo1 = {"inputs": [a, b], "outputs": outputs}
+    createJsonFromTensors(opName + " with no attributes", opName, [caseInfo1], numpyTypeAsString(NP_TYPE))
+
+#export_slice_default_axes(tp.FLOAT)
+#export_slice_default_axes(tp.INT32)
+genJsoncFomeOnnxFile()
