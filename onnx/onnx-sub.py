@@ -4,7 +4,6 @@ from onnx import helper as helper
 from onnx import TensorProto as tp
 import numpy as np
 
-
 def getNPType(dataType):
     if (dataType == tp.UINT32):
         return np.uint32
@@ -37,21 +36,20 @@ def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
     onnx.save(m1, MODEL_NAME)
     ort_sess = ort.InferenceSession(MODEL_NAME)
     outputs = ort_sess.run(None, {'a': t1, 'b': t2})
-
     # Print Result
     print(type(DATA_TYPE).__name__, outputs[0])
-    return m1
 
 op = 'Sub'
-print('FLOAT', tp.FLOAT)
-print('INT32', tp.INT32)
-print('UINT32', tp.UINT32)
-
 DATA_TYPE = tp.FLOAT
 buildAndRunBinaryGraph(op, DATA_TYPE, 'FLOAT')
 
 DATA_TYPE = tp.INT32
 buildAndRunBinaryGraph(op, DATA_TYPE, 'INT32')
 
-DATA_TYPE = tp.UINT32
-buildAndRunBinaryGraph(op, DATA_TYPE, 'UINT32')
+op = 'Sub'
+DATA_TYPE = tp.FLOAT
+buildAndRunBinaryGraph(op, DATA_TYPE, 'FLOAT')
+
+DATA_TYPE = tp.INT32
+buildAndRunBinaryGraph(op, DATA_TYPE, 'INT32')
+

@@ -17,10 +17,10 @@
                 const session = await ort.InferenceSession.create('./Sub_int_UINT32.onnx',{executionProviders: ['webgpu']});
 
                 // prepare inputs. a tensor need its corresponding TypedArray as data
-                const dataB = Int32Array.from([1, 2, 3]);
-                const dataA = Int32Array.from([10, 20, 30]);
-                const tensorA = new ort.Tensor('int32', dataA, [3]);
-                const tensorB = new ort.Tensor('int32', dataB, [3]);
+                const dataB = Uint32Array.from([1, 2, 3]);
+                const dataA = Uint32Array.from([10, 20, 30]);
+                const tensorA = new ort.Tensor('uint32', dataA, [3]);
+                const tensorB = new ort.Tensor('uint32', dataB, [3]);
 
                 // prepare feeds. use model input names as keys.
                 const feeds = { a: tensorA, b: tensorB };
