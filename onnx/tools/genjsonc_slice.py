@@ -22,6 +22,8 @@ def numpyTypeAsString(dataType):
         return "int32"
     elif (dataType == np.float32):
         return ""
+    elif (dataType == np.bool8):
+        return "bool8"
     else:
         return ""
 
@@ -70,6 +72,8 @@ def getNPType(dataType):
         return np.uint32
     elif (dataType == tp.INT32):
         return np.int32
+    elif (dataType == tp.BOOL):
+        return np.bool8
     else:
         return np.float32
 
@@ -81,8 +85,8 @@ def export_slice_default_axes(DATA_TYPE) -> None:
         outputs=["y"],
     )
 
-    x = np.random.randn(5).astype(NP_TYPE)
-    print('x.shape: ', x.shape)
+    x = np.random.choice(a=[False, True], size=(5,)) if DATA_TYPE == tp.BOOL else np.random.randn(5).astype(NP_TYPE)
+    print('x: ', x)
     starts = np.array([3], dtype=np.int64)
     print('starts.shape: ',starts.shape)
     ends = np.array([4], dtype=np.int64)
@@ -100,6 +104,7 @@ def export_slice_default_axes(DATA_TYPE) -> None:
     onnx.save(m1, MODEL_NAME)
     ort_sess = ort.InferenceSession(MODEL_NAME)
     outputs = ort_sess.run(None, {'x': x, 'starts': starts, 'ends': ends})
+    print(outputs)
     # Print Result
     opName = "Slice"
     caseInfo1 = {"inputs": [x, starts, ends], "outputs": outputs}
@@ -118,6 +123,7 @@ def genJsoncFomeOnnxFile(MODEL_NAME = "Sub_int_FLOAT.onnx"):
     caseInfo1 = {"inputs": [a, b], "outputs": outputs}
     createJsonFromTensors(opName + " with no attributes", opName, [caseInfo1], numpyTypeAsString(NP_TYPE))
 
-#export_slice_default_axes(tp.FLOAT)
-#export_slice_default_axes(tp.INT32)
-genJsoncFomeOnnxFile()
+export_slice_default_axes(tp.FLOAT)
+export_slice_default_axes(tp.INT32)
+export_slice_default_axes(tp.BOOL)
+#genJsoncFomeOnnxFile()
