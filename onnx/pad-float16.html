@@ -8,6 +8,7 @@
   <script src="./web/dist/ort.all.js"></script>
   <!--script src="https://cdn.jsdelivr.net/npm/@petamoriken/float16/browser/float16.min.js"></script-->
   <script>
+    // Turn on this for float16 case.
     // const { Float16Array } = float16;
     async function testPadv10Uint16() {
       const session = await ort.InferenceSession.create('./padv2_float16.onnx', { executionProviders: ['webgpu'] });
@@ -23,7 +24,7 @@
       console.log(`data of result tensor 'c': ${dataResult}`);
     }
 
-    async function testPadv10Float16() {   
+    async function testPadv10Float16() {
       const session = await ort.InferenceSession.create('./padv2_float16.onnx', { executionProviders: ['webgpu'] });
       let dataA = Float16Array.from([1.2, 2.5, 3.5, 4, 5, 6.1, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
@@ -37,36 +38,33 @@
       console.log(`data of result tensor 'c': ${dataResult}`);
     }
 
-    async function testPadv19Float16() {   
+    async function testPadv19Float16() {
       const session = await ort.InferenceSession.create('./padv19_float16.onnx', { executionProviders: ['webgpu'] });
       let dataA = Float16Array.from([1.2, 2.5, 3.5, 4]);
       let dataB = BigInt64Array.from([3n, 2n, 2n, 3n]);
       let dataC = Float16Array.from([1.2]);
 
-
-      const tensorA = new ort.Tensor('float16', dataA, [2,2 ]);
+      const tensorA = new ort.Tensor('float16', dataA, [2, 2]);
       const tensorB = new ort.Tensor('int64', dataB, [4]);
       const tensorC = new ort.Tensor('float16', dataC, [1]);
       // prepare feeds. use model input names as keys.
-      const feeds = { input_0: tensorA, input_1: tensorB, input_2: tensorC};
+      const feeds = { input_0: tensorA, input_1: tensorB, input_2: tensorC };
       const results = await session.run(feeds);
       // read from results
       const dataResult = results.output_0.cpuData;
       console.log(`data of result tensor 'c': ${dataResult}`);
     }
 
-    async function testPadv19Uint16() {   
+    async function testPadv19Uint16() {
       const session = await ort.InferenceSession.create('./padv19_float16.onnx', { executionProviders: ['webgpu'] });
       let dataA = Uint16Array.from([1.2, 2.5, 3.5, 4]);
       let dataB = BigInt64Array.from([3n, 2n, 2n, 3n]);
       let dataC = Uint16Array.from([1.2]);
-
-
-      const tensorA = new ort.Tensor('float16', dataA, [2,2 ]);
+      const tensorA = new ort.Tensor('float16', dataA, [2, 2]);
       const tensorB = new ort.Tensor('int64', dataB, [4]);
       const tensorC = new ort.Tensor('float16', dataC, [1]);
       // prepare feeds. use model input names as keys.
-      const feeds = { input_0: tensorA, input_1: tensorB, input_2: tensorC};
+      const feeds = { input_0: tensorA, input_1: tensorB, input_2: tensorC };
       const results = await session.run(feeds);
       // read from results
       const dataResult = results.output_0.cpuData;
