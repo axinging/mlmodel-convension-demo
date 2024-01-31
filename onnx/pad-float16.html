@@ -10,7 +10,7 @@
   <script>
     // const { Float16Array } = float16;
     async function testPadv10Uint16() {
-      const session = await ort.InferenceSession.create('./pad_constant_f16.onnx', { executionProviders: ['webgpu'] });
+      const session = await ort.InferenceSession.create('./padv2_float16.onnx', { executionProviders: ['webgpu'] });
       let dataA = Uint16Array.from([1.2, 2.5, 3.5, 4, 5, 6.1, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 
@@ -24,7 +24,7 @@
     }
 
     async function testPadv10Float16() {   
-      const session = await ort.InferenceSession.create('./pad_constant_f16.onnx', { executionProviders: ['webgpu'] });
+      const session = await ort.InferenceSession.create('./padv2_float16.onnx', { executionProviders: ['webgpu'] });
       let dataA = Float16Array.from([1.2, 2.5, 3.5, 4, 5, 6.1, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 
