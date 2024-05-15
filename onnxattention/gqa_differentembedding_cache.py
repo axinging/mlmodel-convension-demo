@@ -170,7 +170,7 @@ class Attention(nn.Module):
         xv = xv.view(bsz, kv_seqlen, self.n_local_kv_heads, self.kv_head_dim)
 
         print("before embedding xk.shape = " + str(xk.shape))
-        xq, xk = apply_rotary_emb(xq, xk, freqs_cis=freqs_cis)
+        # xq, xk = apply_rotary_emb(xq, xk, freqs_cis=freqs_cis)
         print("xk.shape = " + str(xk.shape))
         #print("self.cache_k.shape = " + str(self.cache_k.shape))
 

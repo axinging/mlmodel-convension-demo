@@ -15,74 +15,107 @@ def Transpose(X):
     """Hardmax is similar to ArgMax, with the result being encoded OneHot style."""
     return op.Transpose(X, perm = [0, 2, 1, 3])
 
-"""
-v = np.array([[[[ 1,  2,  3,  4],
-          [ 5,  6,  7,  8]],
+def transposeOne(v):
 
-         [[ 9, 10, 11, 12],
-          [13, 14, 15, 16]]]], dtype=np.int32)
-"""
-
-def test(v):
-    print("Before Transpose:")
-    print(v)
     # (1, 2, 2, 4)
-    print(v.shape)
+    #print(v.shape)
     result1 = Transpose(v, perm)
     print("Transpose in ONNX 2:")
-    print(result1.flatten())
     print(*result1.flatten(),sep=', ') 
-    print(result1.shape)
+    return result1
 
-
-v = np.array([2, 9, 4, 8, 12, 13, 14, 15], dtype=np.int32)
-v = v.reshape([1,2,1,4])
-#test(v)
-
-#1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39
+import numpy as np
 """
-v = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120], dtype=np.int32)
-v = v.reshape([2,3,4,5])
-#test(v)
+shape= [1,7,2,4]
+start = 1
+v = np.array((np.arange(start, np.prod(shape)+start)), dtype=np.int32).reshape(shape)
+print("before shape : " + str(shape))
+print(v)
+v = v.reshape(shape)
+transposeOne(v)
+"""
+"""
+shape= [1,7,2,4]
+start = 0
+v = np.array((np.arange(start, np.prod(shape)+start)), dtype=np.int32).reshape(shape)
+print("Raw Data from 0 to: ")
+print(*v.flatten(),sep=', ') 
+print("Before Transpose:")
+print(v)
+#print(v)
+v = v.reshape(shape)
 
-v = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40], dtype=np.int32)
-v = v.reshape([1,2,4,5])
-#test(v)
+v = transposeOne(v)
+print("1st Transpose:")
+print(v)
 
-
-# 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56
-v = np.array([41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56], dtype=np.int32)
-v = v.reshape([1,2,2,4])
-test(v)
-
-v = np.array([40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55], dtype=np.int32)
-v = v.reshape([1,2,2,4])
-test(v)
-
-
-v = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.int32)
-v = v.reshape([1,2,1,4])
-test(v)
-
-
-v = np.array([0, 1, 2, 3, 4, 5, 6, 7], dtype=np.int32)
-v = v.reshape([1,2,1,4])
-test(v)
+shape= [1,7,2,4]
+start = 1
+v = np.array((np.arange(start, np.prod(shape)+start)), dtype=np.int32).reshape(shape)
+print("Raw Data from 1 to: ")
+print(*v.flatten(),sep=', ') 
+v = transposeOne(v)
+print("1st Transpose:")
+print(v)
 """
 
-v = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.int32)
-v = v.reshape([1,2,1,4])
-test(v)
 
-v = np.array([0, 1, 2, 3, 4, 5, 6, 7], dtype=np.int32)
-v = v.reshape([1,2,1,4])
-test(v)
+shape= [1,2,2,4]
+start = 1
+v = np.array([1, 2, 3, 4, 9, 10, 11, 12, 5, 6, 7, 8, 13, 14, 15, 16], dtype=np.int32).reshape(shape)
+#1, 9, 1, 1, 1, 12, 21, 131, 131, 22, 21, 2, 2, 2, 2, 2, 22, 21, 2, 2, 2, 131, 22, 21
+#print("Raw Data from 1 to, BNSH: ")
+#print(*v.flatten(),sep=', ') 
+v = transposeOne(v)
+print("1st Transpose, BSNH:")
+print(v)
 
 
-v = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], dtype=np.int32)
-v = v.reshape([1,2,2,4])
-test(v)
 
-v = np.array([0, 1, 2, 3, 8, 9, 10, 11, 4, 5, 6, 7, 12, 13, 14, 15], dtype=np.int32)
-v = v.reshape([1,2,2,4])
-test(v)
+
+shape= [1,2,7,4]
+v = np.array([              1, 2, 3, 4, 9, 10, 11, 12, 17, 18, 19, 20, 25, 26, 27, 28, 33, 34, 35, 36, 41, 42, 43, 44, 45, 46, 47, 48,
+              5, 6, 7, 8, 13, 14, 15, 16, 21, 22, 23, 24, 29, 30, 31, 32, 37, 38, 39, 40, 49, 50, 51, 52, 53, 54, 55, 56], dtype=np.int32).reshape(shape)
+#print("Raw Data from 1 to, BNSH: ")
+#print(*v.flatten(),sep=', ') 
+v = transposeOne(v)
+print("1st Transpose, BSNH:")
+print(v)
+
+
+shape= [1,2,7,4]
+v = np.array([1, 2, 3, 4, 9, 10, 11, 12, 17, 18, 19, 20, 25, 26, 27, 28, 33, 34, 35, 36, 41, 42, 43, 44, 49, 50, 51, 52,
+              5, 6, 7, 8, 13, 14, 15, 16, 21, 22, 23, 24, 29, 30, 31, 32, 37, 38, 39, 40, 45, 46, 47, 48, 53, 54, 55, 56], dtype=np.int32).reshape(shape)
+#print("Raw Data from 1 to, BNSH: ")
+#print(*v.flatten(),sep=', ') 
+v = transposeOne(v)
+print("1st Transpose, BSNH:")
+print(v)
+
+
+shape= [1,7,2,4]
+v = np.array([1, 2, 3, 4, 9, 10, 11, 12, 17, 18, 19, 20, 25, 26, 27, 28, 33, 34, 35, 36, 41, 42, 43, 44, 49, 50, 51, 52,
+              5, 6, 7, 8, 13, 14, 15, 16, 21, 22, 23, 24, 29, 30, 31, 32, 37, 38, 39, 40, 45, 46, 47, 48, 53, 54, 55, 56], dtype=np.int32).reshape(shape)
+#print("Raw Data from 1 to, BNSH: ")
+#print(*v.flatten(),sep=', ') 
+v = transposeOne(v)
+print("1st Transpose, BSNH:")
+print(v)
+
+
+shape= [1,2,7,4]
+v = np.array([1,2,3,4,17,18,19,20,33,34,35,36,49,50,51,52,13,14,15,16,29,30,31,32,45,46,47,48,9,10,11,12,25,26,27,28,41,42,43,44,5,6,7,8,21,22,23,24,37,38,39,40,53,54,55,56], dtype=np.int32).reshape(shape)
+#print("Raw Data from 1 to, BNSH: ")
+#print(*v.flatten(),sep=', ') 
+v = transposeOne(v)
+print("1st Transpose, BSNH:")
+print(v)
+
+
+shape= [1,2,7,4]
+v = np.array([1,2,3,4,17,18,19,20,33,34,35,36,45,46,47,48,13,14,15,16,29,30,31,32,49,50,51,52,5,6,7,8,25,26,27,28,41,42,43,44,9,10,11,12,21,22,23,24,37,38,39,40,53,54,55,56], dtype=np.int32).reshape(shape)
+#print("Raw Data from 1 to, BNSH: ")
+#print(*v.flatten(),sep=', ') 
+v = transposeOne(v)
+print("1st Transpose, BSNH:")
+print(v)
