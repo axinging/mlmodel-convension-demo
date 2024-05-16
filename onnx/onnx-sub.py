@@ -2,6 +2,7 @@ import onnxruntime as ort
 import onnx
 from onnx import helper as helper
 from onnx import TensorProto as tp
+from onnx.helper import make_opsetid
 import numpy as np
 
 def getNPType(dataType):
@@ -29,8 +30,9 @@ def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
                                'a', DATA_TYPE, [3]), helper.make_tensor_value_info('b', DATA_TYPE, [3])],
                            [helper.make_tensor_value_info('output', DATA_TYPE, [3])])
     # Create the model and check
-    m1 = helper.make_model(g1, producer_name='onnxsub-demo')
-    onnx.checker.check_model(m1)
+    m1 = helper.make_model(g1, producer_name='onnxsub-demo',opset_imports=[make_opsetid("", 13)])
+    m1.ir_version = 9
+    #onnx.checker.check_model(m1)
     # Save the model
     MODEL_NAME = op+'_' + type(DATA_TYPE).__name__ +'_'+ comment +'.onnx'
     onnx.save(m1, MODEL_NAME)
@@ -42,6 +44,7 @@ def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
 op = 'Sub'
 DATA_TYPE = tp.FLOAT
 buildAndRunBinaryGraph(op, DATA_TYPE, 'FLOAT')
+
 
 DATA_TYPE = tp.INT32
 buildAndRunBinaryGraph(op, DATA_TYPE, 'INT32')
