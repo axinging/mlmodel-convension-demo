@@ -16,17 +16,16 @@ import numpy as np
 import numpy as np
 
 
-def dumpAsJson(name, op, input, inputShape, filter, filterShape, kernel_size, output, outputShape, stride, dilation, padding, useBias, bias, biasShape):
+def dumpAsJson(name, suffix, op, input, inputShape, filter, filterShape, kernel_size, output, outputShape, stride, dilation, padding, useBias, bias, biasShape):
     data = {}
     biasStr = ''
-    if bias is not None:
+    if useBias == 1:
         biasStr = ' with bias'
+    if (padding.upper() == 'SAME'):
+        padding = 'SAME_UPPER'
     data['name'] = name + biasStr + ', x=' + ''.join(str(inputShape)) + ', f=' + ''.join(
         str(filterShape)) + ', s='+str(stride) + ', d='+str(dilation) + ', p='+str(padding)
     data['operator'] = op
-    print(padding)
-    if (padding.upper() == 'SAME'):
-        padding = 'SAME_UPPER'
     data['attributes'] = [
         {"name": "kernel_shape", "data": kernel_size, "type": "ints"},
         {"name": "auto_pad", "data": padding.upper(), "type": "string"},
@@ -91,7 +90,7 @@ def dumpAsJson(name, op, input, inputShape, filter, filterShape, kernel_size, ou
     # data['operator'] = op
     # json_data = json.dumps(data)
     # print(json_data)
-    with open(name+'.jsonc', 'w') as f:
+    with open(name+suffix+'.jsonc', 'w') as f:
         json_data = json.dump([data], f)
         # print(json_data)
 
@@ -130,14 +129,10 @@ def Conv(X, w, bias):
     return op.Conv(X, w, bias, auto_pad=paddingOX, dilations=[dilation, dilation, dilation], group=1, kernel_shape=kernel_size)
 
 
-def ConvOne(v, w, bias, padding):
-    if (padding.upper() == 'SAME'):
-        padding = 'SAME_UPPER'
-    result1 = Conv(v, w, bias, padding)
+def ConvOne(v, w, bias):
+    result1 = Conv(v, w, bias)
     # print(*result1.flatten(),sep=', ')
     return result1
-
-# np.random.rand(3,2)
 
 
 def runPytorch():
@@ -161,22 +156,22 @@ def runPytorch():
     print(type(output))  # outShape = [1, 2, 1, 1, 1]
     # print((output.flatten()))
 
-    dumpAsJson('conv3dpt', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
+    dumpAsJson('conv3d', 'pt', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
                output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), useBias, bias.flatten().tolist(), biasShape)
     # dumpAsJson('conv3d', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size, output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), None, biasShape)
     return torch.Tensor.numpy(output)
 
 
-def runOnnsScript():
-    output = ConvOne(input, filter, bias, padding)
+def runOnnxScript():
+    output = ConvOne(input, filter, bias)
     print("Conv in ONNX:")
     print(type(output))
-    dumpAsJson('conv3dox', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
-               output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), useBias, bias.flatten().tolist(), biasShape)
+    dumpAsJson('conv3d', 'ox', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
+               output.flatten().tolist(), output.shape, stride, dilation, paddingOX.upper(), useBias, bias.flatten().tolist(), biasShape)
     return output
 
 
-outOS = runOnnsScript()
+outOS = runOnnxScript()
 
 outPT = runPytorch()
 
