@@ -15,6 +15,7 @@ import torch.nn.functional as F
 import numpy as np
 import numpy as np
 
+
 def dumpAsJson(name, op, input, inputShape, filter, filterShape, kernel_size, output, outputShape, stride, dilation, padding, useBias, bias, biasShape):
     data = {}
     biasStr = ''
@@ -95,18 +96,6 @@ def dumpAsJson(name, op, input, inputShape, filter, filterShape, kernel_size, ou
         # print(json_data)
 
 
-@script()
-def Conv(X, w, bias):
-    """Hardmax is similar to ArgMax, with the result being encoded OneHot style."""
-    return op.Conv(X, w, bias, auto_pad='SAME_UPPER')
-
-
-def ConvOne(v, w, bias):
-    result1 = Conv(v, w, bias)
-    # print(*result1.flatten(),sep=', ')
-    return result1
-
-
 inputShape = [1, 1, 4, 4, 4]
 outputChannel = 5
 channel = inputShape[1]
@@ -129,9 +118,28 @@ bias = (np.random.rand(*tuple(biasShape))*10).astype('f').round(1)
 stride = 1
 dilation = 1
 padding = 'same'
+paddingOX = padding
+if (padding.upper() == 'SAME'):
+    paddingOX = 'SAME_UPPER'
 
+
+@script()
+def Conv(X, w, bias):
+    """Hardmax is similar to ArgMax, with the result being encoded OneHot style."""
+    # print(padding)
+    return op.Conv(X, w, bias, auto_pad=paddingOX, dilations=[dilation, dilation, dilation], group=1, kernel_shape=kernel_size)
+
+
+def ConvOne(v, w, bias, padding):
+    if (padding.upper() == 'SAME'):
+        padding = 'SAME_UPPER'
+    result1 = Conv(v, w, bias, padding)
+    # print(*result1.flatten(),sep=', ')
+    return result1
 
 # np.random.rand(3,2)
+
+
 def runPytorch():
     # NCDHW
     m = nn.Conv3d(inputChannel, outChannel, kernel_size,
@@ -160,20 +168,18 @@ def runPytorch():
 
 
 def runOnnsScript():
-    output = ConvOne(input, filter, bias)
+    output = ConvOne(input, filter, bias, padding)
     print("Conv in ONNX:")
     print(type(output))
     return output
 
 
-outOS= runOnnsScript()
+outOS = runOnnsScript()
 
 outPT = runPytorch()
 
 print(type(outOS))
 print(type(outPT))
 print(np.allclose(outOS, outPT))
-#.
+# .
 print(np.array_equiv(outOS, outPT))
-
-
