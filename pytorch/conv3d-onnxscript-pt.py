@@ -161,7 +161,7 @@ def runPytorch():
     print(type(output))  # outShape = [1, 2, 1, 1, 1]
     # print((output.flatten()))
 
-    dumpAsJson('conv3d', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
+    dumpAsJson('conv3dpt', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
                output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), useBias, bias.flatten().tolist(), biasShape)
     # dumpAsJson('conv3d', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size, output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), None, biasShape)
     return torch.Tensor.numpy(output)
@@ -171,6 +171,8 @@ def runOnnsScript():
     output = ConvOne(input, filter, bias, padding)
     print("Conv in ONNX:")
     print(type(output))
+    dumpAsJson('conv3dox', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
+               output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), useBias, bias.flatten().tolist(), biasShape)
     return output
 
 
