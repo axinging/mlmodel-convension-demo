@@ -106,11 +106,11 @@ input = (np.random.rand(*tuple(inputShape))*10).astype('f').round(1)
 kernel_size = (1, 1, 1)
 filterShape = [outputChannel, channel,
                kernel_size[0], kernel_size[1], kernel_size[2]]
-outChannel = filterShape[0]
+#outChannel = filterShape[0]
 filter = (np.random.rand(*tuple(filterShape))*10).astype('f').round(1)
 # print(filter.flatten())
 useBias = 1
-biasShape = [outChannel]
+biasShape = [outputChannel]
 # bias = np.array([0, 0], dtype=np.float32).reshape(biasShape)
 bias = (np.random.rand(*tuple(biasShape))*10).astype('f').round(1)
 # kernel_size = (filterShape[2], filterShape[3],filterShape[4])
@@ -120,6 +120,90 @@ padding = 'same'
 paddingOX = padding
 if (padding.upper() == 'SAME'):
     paddingOX = 'SAME_UPPER'
+
+outputWeb = input
+
+'''
+      { "name": "kernel_shape", "data": [2, 1, 2], "type": "ints" },
+      { "name": "auto_pad", "data": "VALID", "type": "string" },
+      { "name": "strides", "data": [1, 1, 1], "type": "ints" },
+      { "name": "dilations", "data": [1, 1, 1], "type": "ints" }
+
+          "cases": [
+      {
+        "name": "T[0]",
+        "inputs": [
+          {
+            "data": [0.25, 0.5, 0.75, 1],
+            "dims": [1, 1, 2, 1, 2],
+            "type": "float32"
+          },
+          {
+            "data": [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1],
+            "dims": [2, 1, 2, 1, 2],
+            "type": "float32"
+          }
+        ],
+        "outputs": [
+          {
+            "data": [0.9375, 2.1875],
+            "dims": [1, 2, 1, 1, 1],
+            "type": "float32"
+          }
+        ]
+      }
+    ]
+'''
+with open('conv3dncdhw.jsonc') as f:
+    caseIndex = 3
+    jsoncData = json.load(f)
+    #conv3dncdhw
+    attributes = jsoncData[caseIndex]['attributes']
+    cases = jsoncData[caseIndex]['cases']
+    kernel_shape = attributes[0]['data']
+    kernel_size = kernel_shape
+    auto_pad = attributes[1]['data']
+
+    padding = auto_pad.lower()
+    paddingOX = auto_pad.upper()
+    if (paddingOX == 'SAME'):
+        paddingOX = 'SAME_UPPER'
+
+    stride = attributes[2]['data'][0]
+    dilations = attributes[3]['data'][0]
+    #print('kernel_shape =' + str(kernel_shape) + ',auto_pad =' + str(auto_pad) + ',strides =' + str(stride)+ ',dilations =' + str(dilations))
+    inputShape = cases[0]['inputs'][0]['dims']
+    #print('inputShape =' + str(inputShape))
+
+    input = arr = np.array(cases[0]['inputs'][0]['data'], dtype='float32').reshape(inputShape)
+    #print('input =' + str(input))
+
+    filterShape = cases[0]['inputs'][1]['dims']
+    #print('filterShape =' + str(filterShape))
+    filter = arr = np.array(cases[0]['inputs'][1]['data'], dtype='float32').reshape(filterShape)
+    #print('filter =' + str(filter))
+    outputChannel = filterShape[0]
+    #print('outputChannel =' + str(outputChannel))
+    channel = inputShape[1]
+    inputChannel = inputShape[1]
+    #print("cases[0]['inputs'].length " + str(len(cases[0]['inputs'])))
+    if (len(cases[0]['inputs']) == 2):
+        useBias = 0
+        biasShape = [outputChannel]
+        #bias = np.array([0, 0], dtype=np.float32).reshape(biasShape) 
+        bias = np.zeros(biasShape).astype('f')
+        #print("bias =" + str(bias))
+    else:
+        biasShape = [outputChannel]
+        # bias = np.array([0, 0], dtype=np.float32).reshape(biasShape)
+        bias = arr = np.array(cases[0]['inputs'][2]['data'], dtype='float32').reshape(filterShape)
+    
+
+    outputWebShape = cases[0]['outputs'][0]['dims']
+    #print('outputWebShape =' + str(outputWebShape))
+
+    outputWeb = arr = np.array(cases[0]['outputs'][0]['data'], dtype='float32').reshape(outputWebShape)
+    #print('outputWeb =' + str(outputWeb))
 
 
 @script()
@@ -137,7 +221,7 @@ def ConvOne(v, w, bias):
 
 def runPytorch():
     # NCDHW
-    m = nn.Conv3d(inputChannel, outChannel, kernel_size,
+    m = nn.Conv3d(inputChannel, outputChannel, kernel_size,
                   stride=stride, dilation=dilation, padding=padding)
     m.bias = torch.nn.Parameter(
         torch.from_numpy(bias).float().reshape(biasShape))
@@ -147,13 +231,13 @@ def runPytorch():
     # m = m.to(memory_format=torch.channels_last_3d)
     # non-square kernels and unequal stride and with padding
     inputT = torch.from_numpy(input).reshape(inputShape)
-    print(inputT.shape)
+    #print(inputT.shape)
     inputT = inputT.to(memory_format=torch.channels_last_3d)
-    print(inputT.shape)
+    #print(inputT.shape)
     with torch.no_grad():
         output = m(inputT)
-    print("Conv in ONNX:")
-    print(type(output))  # outShape = [1, 2, 1, 1, 1]
+    #print("Conv in PT:")
+    #print(type(output))  # outShape = [1, 2, 1, 1, 1]
     # print((output.flatten()))
 
     dumpAsJson('conv3d', 'pt', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
@@ -164,9 +248,9 @@ def runPytorch():
 
 def runOnnxScript():
     output = ConvOne(input, filter, bias)
-    print("Conv in ONNX nnn:")
-    print(type(output))
-    print(output.shape)
+    #print("Conv in ONNX nnn:")
+    #print(type(output))
+    #print(output.shape)
     dumpAsJson('conv3d', 'ox', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
                output.flatten().tolist(), output.shape, stride, dilation, paddingOX.upper(), useBias, bias.flatten().tolist(), biasShape)
     return output
@@ -176,8 +260,18 @@ outOS = runOnnxScript()
 
 outPT = runPytorch()
 
-print(type(outOS))
-print(type(outPT))
+#print((outOS))
+#print((outPT))
+#print((outputWeb))
+#
+#print((outOS.shape))
+#print((outPT.shape))
+#print((outputWeb.shape))
+#
+#print(type(outOS))
+#print(type(outPT))
+#print(type(outputWeb))
+print(np.allclose(outOS.flatten().tolist(), outputWeb.flatten().tolist()))
+print(np.allclose(outPT.flatten().tolist(), outputWeb.flatten().tolist()))
 print(np.allclose(outOS, outPT))
-# .
 print(np.array_equiv(outOS, outPT))
