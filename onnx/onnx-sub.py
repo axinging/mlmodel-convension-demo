@@ -18,6 +18,9 @@ def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
 
     t1 = np.array([4, 8, 9]).astype(NP_TYPE)
     t2 = np.array([1, 3, 9]).astype(NP_TYPE)
+    t1Shape = [3]
+    t2Shape = [3]
+    outShape = [3]
     # The required constants:
     c1 = helper.make_node('Constant', inputs=[], outputs=['c1'], name='c1-node',
                           value=helper.make_tensor(name='c1v', data_type=DATA_TYPE,
@@ -27,8 +30,8 @@ def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
     # Create the graph
     g1 = helper.make_graph([n1], 'preprocessing',
                            [helper.make_tensor_value_info(
-                               'a', DATA_TYPE, [3]), helper.make_tensor_value_info('b', DATA_TYPE, [3])],
-                           [helper.make_tensor_value_info('output', DATA_TYPE, [3])])
+                               'a', DATA_TYPE, t1Shape), helper.make_tensor_value_info('b', DATA_TYPE, t2Shape)],
+                           [helper.make_tensor_value_info('output', DATA_TYPE, outShape)])
     # Create the model and check
     m1 = helper.make_model(g1, producer_name='onnxsub-demo',opset_imports=[make_opsetid("", 13)])
     m1.ir_version = 9
