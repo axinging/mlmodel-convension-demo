@@ -252,16 +252,21 @@ with open('conv3dncdhw.jsonc') as f:
         channel = inputShape[1]
         inputChannel = inputShape[1]
         #print("cases[0]['inputs'].length " + str(len(cases[0]['inputs'])))
+        print('len of input: ' + str(len(cases[0]['inputs'])))
         if (len(cases[0]['inputs']) == 2):
             useBias = 0
             biasShape = [outputChannel]
             #bias = np.array([0, 0], dtype=np.float32).reshape(biasShape) 
             bias = np.zeros(biasShape).astype('f')
-            #print("bias =" + str(bias))
+            print("bias =" + str(bias))
+            print('biasShape =' + str(biasShape))
         else:
+            useBias = 1
             biasShape = [outputChannel]
             # bias = np.array([0, 0], dtype=np.float32).reshape(biasShape)
-            bias = arr = np.array(cases[0]['inputs'][2]['data'], dtype='float32').reshape(filterShape)
+            bias = arr = np.array(cases[0]['inputs'][2]['data'], dtype='float32').reshape(biasShape)
+            print("bias =" + str(bias))
+            print('biasShape =' + str(biasShape))
         
 
         outputWebShape = cases[0]['outputs'][0]['dims']
