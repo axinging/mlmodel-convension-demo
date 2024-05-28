@@ -43,7 +43,7 @@ def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
         inputData = json.load(f)
         #conv3dncdhw
         input = arr = np.array(inputData['data'], dtype='float32').reshape(inputShape)
-        MODEL_NAME = './brainchop/model_5_channels.onnx'
+        MODEL_NAME = './brainchop/model_30_channels.onnx'
         #onnx.save(m1, MODEL_NAME)
         ort_sess = ort.InferenceSession(MODEL_NAME)
         outputs = ort_sess.run(None, {'input.1': input})
