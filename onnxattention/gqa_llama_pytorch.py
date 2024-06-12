@@ -257,7 +257,7 @@ def attention_ref(
     output = torch.einsum("bhts,bshd->bthd", attention_drop, v * dropout_scaling)
     if query_padding_mask is not None:
         output.masked_fill_(rearrange(~query_padding_mask, "b s -> b s 1 1"), 0.0)
-    print("output shape in pt " + str(output.shape))
+    #print("output shape in pt " + str(output.shape))
     return output#.to(dtype=dtype_og), attention.to(dtype=dtype_og)
 
 
@@ -269,10 +269,13 @@ def test(qD, kD, vD, oD, inputDims, model_args):
     k = torch.Tensor(kD).reshape(inputDims[1])
     v = torch.Tensor(vD).reshape(inputDims[2])
     output = model(q,k,v, 0, None)
+    print('output from pytorch: ')
+    print(output)
     outputRef = torch.Tensor(oD).reshape(output.shape)
     print(torch.allclose(output, outputRef, rtol=1e-01, atol=1e-01,)) 
-    print(" output shape  in pt " + str(output.shape))
-
+    #print(" output shape  in pt " + str(output.shape))
+    print('outputRef from outputRef: ')
+    print(outputRef)
     qShape = inputDims[0]
     kShape = inputDims[1] 
     vShape = inputDims[2]
@@ -280,18 +283,21 @@ def test(qD, kD, vD, oD, inputDims, model_args):
     kShape = [kShape[0], kShape[1], model_args.n_kv_heads, int(kShape[2]/model_args.n_kv_heads)]
     vShape = [vShape[0], vShape[1], model_args.n_kv_heads, int(vShape[2]/model_args.n_kv_heads)]
     outputLlama = attention_ref(q.reshape(qShape), k.reshape(kShape), v.reshape(vShape))
+    print('outputLlama from outputLlama: ')
+    print(outputLlama)
     outShape = output.shape
     #outShape = [outShape[0], outShape[1], model_args.n_heads, int(outShape[2]/model_args.n_heads)]
 
-    print(" output shape  " + str(output.shape))
+    #print(" output shape  " + str(output.shape))
     
     outputLlama = outputLlama.reshape(outShape)
-    print(" outputLlama shape  " + str(outputLlama.shape))
+    #print(" outputLlama shape  " + str(outputLlama.shape))
     #print(output)
     #print(outputRef)
     print(torch.allclose(output, outputLlama, rtol=1e-01, atol=1e-01,)) 
 
-import json
+#import json
+import json5 as json
 def getCaseInputOutput(fileName):
     # Opening JSON file
     f = open(fileName)
@@ -319,16 +325,19 @@ def getCaseInputOutput(fileName):
         inputDims = []
         #dim = 0
         for input in i["cases"][0]["inputs"]:
-            inputs.append((input["data"]))
-            inputDims.append(input["dims"])
+            if ("dims" in input and "data" in input):
+                inputs.append((input["data"]))
+                inputDims.append(input["dims"])
 
         inputCorrect = True
+        '''
         for dim in inputDims:
             #print(dim[2], " dd ", inputDims[0][2])
             if (dim[1]!=inputDims[0][1]):
                 inputCorrect = False
                 print("Case skipped !!!!!!!!!!!!!! The seq len  of Q K V not match!")
                 break
+        '''
         #print("inputCorrect = " + str(inputCorrect))
         inputCorrect = True
         if (inputCorrect) :
@@ -343,4 +352,4 @@ def getCaseInputOutput(fileName):
     f.close()
 
 
-print(getCaseInputOutput("group-query-attention.jsonc"))
+print(getCaseInputOutput("group-query-attention-prompt.jsonc"))
