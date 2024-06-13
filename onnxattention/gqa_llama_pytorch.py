@@ -269,13 +269,13 @@ def test(qD, kD, vD, oD, inputDims, model_args):
     k = torch.Tensor(kD).reshape(inputDims[1])
     v = torch.Tensor(vD).reshape(inputDims[2])
     output = model(q,k,v, 0, None)
-    print('output from pytorch: ')
-    print(output)
+    #print('output from pytorch: ')
+    #print(output)
     outputRef = torch.Tensor(oD).reshape(output.shape)
     print(torch.allclose(output, outputRef, rtol=1e-01, atol=1e-01,)) 
     #print(" output shape  in pt " + str(output.shape))
-    print('outputRef from outputRef: ')
-    print(outputRef)
+    #print('outputRef from outputRef: ')
+    #print(outputRef)
     qShape = inputDims[0]
     kShape = inputDims[1] 
     vShape = inputDims[2]
@@ -283,8 +283,8 @@ def test(qD, kD, vD, oD, inputDims, model_args):
     kShape = [kShape[0], kShape[1], model_args.n_kv_heads, int(kShape[2]/model_args.n_kv_heads)]
     vShape = [vShape[0], vShape[1], model_args.n_kv_heads, int(vShape[2]/model_args.n_kv_heads)]
     outputLlama = attention_ref(q.reshape(qShape), k.reshape(kShape), v.reshape(vShape))
-    print('outputLlama from outputLlama: ')
-    print(outputLlama)
+    #print('outputLlama from outputLlama: ')
+    #print(outputLlama)
     outShape = output.shape
     #outShape = [outShape[0], outShape[1], model_args.n_heads, int(outShape[2]/model_args.n_heads)]
 

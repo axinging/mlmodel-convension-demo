@@ -984,9 +984,6 @@ def attention_ref(
         output: (batch_size, seqlen_q, nheads, head_dim)
         attention: (batch_size, nheads, seqlen_q, seqlen_k), softmax after dropout
     """
-    print(query_padding_mask)
-    print(key_padding_mask)
-    print(dropout_p)
     if causal:
         window_size = (window_size[0], 0)
     dtype_og = q.dtype
@@ -1028,6 +1025,7 @@ def attention_ref(
     v = repeat(v, "b s h d -> b s (h g) d", g=q.shape[2] // v.shape[2])
     print(" k shape = " + str(k.shape))
     print(" v shape = " + str(v.shape))
+    print('window_size ' + str(window_size))
 
     d = q.shape[-1]
     print("d " + str(d))
@@ -1090,7 +1088,7 @@ def attention_qkvpacked_ref(
 
 def parity_check_gqa_prompt_no_buff(
     config,
-    causal=True,
+    causal=False,
     local=False,
     past_format=Formats.BSNH,
     rotary=False,
@@ -1175,13 +1173,13 @@ def parity_check_gqa_prompt_no_buff(
     v_cache_rep = repeat(v_cache_ref, "b s h d -> b s (h g) d", g=config.num_heads // config.kv_num_heads)
     #out_ref, _ = attention_ref(
     out_ref = attention_ref(
-        q_ro, k_cache_rep, v_cache_rep, None, new_mask, 0.0, None, causal=True, window_size=window_size
+        q_ro, k_cache_rep, v_cache_rep, None, new_mask, 0.0, None, causal=causal, window_size=window_size
     )
     out_ref = out_ref.detach().cpu().numpy()
     if past_format == Formats.BNSH:
         k_cache_ref = k_cache_ref.transpose(1, 2)
         v_cache_ref = v_cache_ref.transpose(1, 2)
-
+    print('window_size ' + str(window_size) + ', left_window_size = '+ str(left_window_size))
     # Flash function
     if packed:
         packed_qkv = torch.concatenate([q, new_k, new_v], dim=2)
