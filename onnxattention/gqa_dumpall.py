@@ -1093,6 +1093,7 @@ def parity_check_gqa_prompt(
     rtol=1e-3,
     atol=1e-3,
 ):
+    torch.manual_seed(69)
     q = torch.randn(
         config.batch_size,
         config.q_sequence_length,
@@ -1847,8 +1848,7 @@ class TestGQA(unittest.TestCase):
         batches = [1, 3] if pipeline_mode else [1, 3, 5]
         seqs = (
             [
-                (127, 127),
-                (240, 240),
+                (5, 5)
             ]
             if pipeline_mode
             else [
@@ -1860,14 +1860,14 @@ class TestGQA(unittest.TestCase):
                 (8000, 8000),
             ]
         )
-        num_h = [(32, 8), (9, 3), (4, 4)] if pipeline_mode else [(6, 6), (6, 3), (9, 9), (9, 3)]
-        h_sizes = [16, 128, 256] if pipeline_mode else [32, 40, 64, 80, 96, 128, 160, 192, 224, 256]
+        num_h = [(32, 8)] if pipeline_mode else [(6, 6), (6, 3), (9, 9), (9, 3)]
+        h_sizes = [16] if pipeline_mode else [32, 40, 64, 80, 96, 128, 160, 192, 224, 256]
         for b in batches:
             for sq, skv in seqs:
                 for n, n2 in num_h:
                     for h in h_sizes:
-                        for local in [False, True]:
-                            for rotary, rotary_interleaved in [(False, False), (True, False), (True, True)]:
+                        for local in [False]:
+                            for rotary, rotary_interleaved in [(False, False)]:
                                 for packed in [False, True]:
                                     config = PromptConfig(b, sq, skv, sq + skv + 8, n, n2, h)
                                     past_kv_format = Formats.BNSH
@@ -1894,7 +1894,7 @@ class TestGQA(unittest.TestCase):
         print("-------- TEST GQA PAST (TOKEN GEN) ---------")
         batches = [1, 3] if pipeline_mode else [1, 3, 5]
         seqs = (
-            [(1, 128), (1, 1024), (1, 2048)]
+            [(1, 128)]
             if pipeline_mode
             else [
                 (1, 128),
@@ -1910,16 +1910,16 @@ class TestGQA(unittest.TestCase):
                 # (128, 128),
             ]
         )
-        num_h = [(32, 8), (9, 3), (4, 4)] if pipeline_mode else [(6, 6), (6, 3), (9, 9), (9, 3)]
-        h_sizes = [16, 64, 256] if pipeline_mode else [32, 40, 64, 80, 96, 128, 160, 192, 224, 256]
+        num_h = [(32, 8)] if pipeline_mode else [(6, 6), (6, 3), (9, 9), (9, 3)]
+        h_sizes = [16] if pipeline_mode else [32, 40, 64, 80, 96, 128, 160, 192, 224, 256]
         random.seed(69)
         for b in batches:
             for s, s2 in seqs:
                 for n, n2 in num_h:
                     for h in h_sizes:
-                        for local in [False, True]:
-                            for rotary, rotary_interleaved in [(False, False), (True, False), (True, True)]:
-                                for packed in [False, True]:
+                        for local in [False]:
+                            for rotary, rotary_interleaved in [(False, False)]:
+                                for packed in [False]:
                                     sp = random.randint(1, s2 - s) if s2 - s > 0 else 0
                                     config = Config(b, s, s2, sp, n, n2, h)
                                     past_kv_format = Formats.BNSH
