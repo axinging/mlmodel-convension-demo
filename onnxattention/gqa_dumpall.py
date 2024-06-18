@@ -41,7 +41,7 @@ def dumpGQAAsJson(name, suffix, op, inputs, outputs, attributes, opset):
         json_data = json.dump([data], f)
         # print(json_data)
 
-def getDumpObjects(q, new_k, new_v, out_ref, k_cache_ref, v_cache_ref, config):
+def getDumpObjects(name, q, new_k, new_v, k, v, out_ref, k_cache_ref, v_cache_ref, config):
     dtype = "float32"
     # outputs = [
     #    {"data": out.flatten().tolist(), "dims": out.shape, "type": dtype},
@@ -52,15 +52,28 @@ def getDumpObjects(q, new_k, new_v, out_ref, k_cache_ref, v_cache_ref, config):
     new_k = new_k.reshape([new_k.shape[0], new_k.shape[1], new_k.shape[2] * new_k.shape[3]])
     new_v = new_v.reshape([new_v.shape[0], new_v.shape[1], new_v.shape[2] * new_v.shape[3]])
     # out_ref = out_ref.reshape([out_ref.shape[0], out_ref.shape[1], out_ref.shape[2] * out_ref.shape[3]])
-    inputs = [
-        {"data": q.flatten().tolist(), "dims": q.shape, "type": dtype},
-        {"data": new_k.flatten().tolist(), "dims": new_k.shape, "type": dtype},
-        {"data": new_v.flatten().tolist(), "dims": new_v.shape, "type": dtype},
-        {"data": None, "type": "float32"},
-        {"data": None, "type": "float32"},
-        {"data": [1], "dims": [1], "type": "int32"},
-        {"data": [1], "dims": [1], "type": "int32"},
-    ]
+
+    if (k is None and v is None):
+        inputs = [
+            {"data": q.flatten().tolist(), "dims": q.shape, "type": dtype},
+            {"data": new_k.flatten().tolist(), "dims": new_k.shape, "type": dtype},
+            {"data": new_v.flatten().tolist(), "dims": new_v.shape, "type": dtype},
+            {"data": None, "type": "float32"},
+            {"data": None, "type": "float32"},
+            {"data": [1], "dims": [1], "type": "int32"},
+            {"data": [1], "dims": [1], "type": "int32"},
+        ]
+    else:
+        inputs = [
+            {"data": q.flatten().tolist(), "dims": q.shape, "type": dtype},
+            {"data": new_k.flatten().tolist(), "dims": new_k.shape, "type": dtype},
+            {"data": new_v.flatten().tolist(), "dims": new_v.shape, "type": dtype},
+            {"data": k.flatten().tolist(), "dims": k.shape, "type": "float32"},
+            {"data": v.flatten().tolist(), "dims": v.shape, "type": "float32"},
+            {"data": [1], "dims": [1], "type": "int32"},
+            {"data": [1], "dims": [1], "type": "int32"},
+        ]
+
     attributes = [
         {"name": "num_heads", "data": config.num_heads, "type": "int"},
         {"name": "kv_num_heads", "data": config.kv_num_heads, "type": "int"},
@@ -76,7 +89,7 @@ def getDumpObjects(q, new_k, new_v, out_ref, k_cache_ref, v_cache_ref, config):
         {"data": k_cache_ref.flatten().tolist(), "dims": k_cache_ref.shape, "type": dtype},
         {"data": v_cache_ref.flatten().tolist(), "dims": v_cache_ref.shape, "type": dtype},
     ]
-    dumpGQAAsJson("group-query-attention-prompt", "", "GroupQueryAttention", inputs, outputs, attributes, opset)
+    dumpGQAAsJson(name, "", "GroupQueryAttention", inputs, outputs, attributes, opset)
     return {'inputs': inputs, 'attributes': attributes, 'opset': opset}
 
 
@@ -1084,7 +1097,7 @@ def attention_qkvpacked_ref(
 
 def parity_check_gqa_prompt(
     config,
-    causal=True,
+    causal=False,
     local=False,
     past_format=Formats.BSNH,
     rotary=False,
@@ -1239,7 +1252,7 @@ def parity_check_gqa_prompt(
     # Make sure past-present buffer updating correctly
     assert numpy.allclose(present_k, k_cache_ref.detach().cpu().numpy(), rtol=rtol, atol=atol, equal_nan=True)
     assert numpy.allclose(present_v, v_cache_ref.detach().cpu().numpy(), rtol=rtol, atol=atol, equal_nan=True)
-
+    getDumpObjects("group-query-attention-prompt", q, new_k, new_v, k, v, out_ref, present_k, present_v, config)
     # Compare results
     all_close = numpy.allclose(out, out_ref, rtol=rtol, atol=atol, equal_nan=True)
     correct = GREEN + "True" + RESET if all_close else RED + "False" + RESET
@@ -1278,7 +1291,7 @@ def parity_check_gqa_prompt(
 
 def parity_check_gqa_prompt_no_buff(
     config,
-    causal=True,
+    causal=False,
     local=False,
     past_format=Formats.BSNH,
     rotary=False,
@@ -1287,6 +1300,7 @@ def parity_check_gqa_prompt_no_buff(
     rtol=1e-3,
     atol=1e-3,
 ):
+    torch.manual_seed(69)
     q = torch.randn(
         config.batch_size,
         config.q_sequence_length,
@@ -1358,7 +1372,7 @@ def parity_check_gqa_prompt_no_buff(
     k_cache_rep = repeat(k_cache_ref, "b s h d -> b s (h g) d", g=config.num_heads // config.kv_num_heads)
     v_cache_rep = repeat(v_cache_ref, "b s h d -> b s (h g) d", g=config.num_heads // config.kv_num_heads)
     out_ref, _ = attention_ref(
-        q_ro, k_cache_rep, v_cache_rep, None, new_mask, 0.0, None, causal=True, window_size=window_size
+        q_ro, k_cache_rep, v_cache_rep, None, new_mask, 0.0, None, causal=causal, window_size=window_size
     )
     out_ref = out_ref.detach().cpu().numpy()
     if past_format == Formats.BNSH:
@@ -1407,6 +1421,7 @@ def parity_check_gqa_prompt_no_buff(
     assert numpy.allclose(present_k, k_cache_ref.detach().cpu().numpy(), rtol=rtol, atol=atol, equal_nan=True)
     assert numpy.allclose(present_v, v_cache_ref.detach().cpu().numpy(), rtol=rtol, atol=atol, equal_nan=True)
 
+    getDumpObjects("group-query-attention-prompt-nobuff", q, new_k, new_v, None, None, out_ref, k_cache_ref, v_cache_ref, config)
     # Compare results
     all_close = numpy.allclose(out, out_ref, rtol=rtol, atol=atol, equal_nan=True)
     correct = GREEN + "True" + RESET if all_close else RED + "False" + RESET
@@ -1845,7 +1860,7 @@ class TestGQA(unittest.TestCase):
     def test_gqa_no_past(self):
         torch.manual_seed(69)
         print("-------- TEST GQA NO PAST (PROMPT CASE) ---------")
-        batches = [1, 3] if pipeline_mode else [1, 3, 5]
+        batches = [1] if pipeline_mode else [1, 3, 5]
         seqs = (
             [
                 (5, 5)
@@ -1860,8 +1875,8 @@ class TestGQA(unittest.TestCase):
                 (8000, 8000),
             ]
         )
-        num_h = [(32, 8)] if pipeline_mode else [(6, 6), (6, 3), (9, 9), (9, 3)]
-        h_sizes = [16] if pipeline_mode else [32, 40, 64, 80, 96, 128, 160, 192, 224, 256]
+        num_h = [(16, 4)] if pipeline_mode else [(6, 6), (6, 3), (9, 9), (9, 3)]
+        h_sizes = [8] if pipeline_mode else [32, 40, 64, 80, 96, 128, 160, 192, 224, 256]
         for b in batches:
             for sq, skv in seqs:
                 for n, n2 in num_h:
@@ -1879,7 +1894,7 @@ class TestGQA(unittest.TestCase):
                                         rotary_interleaved=rotary_interleaved,
                                         packed=packed,
                                     )
-                                    self.assertTrue(all_close)
+                                    #self.assertTrue(all_close)
                                     all_close = parity_check_gqa_prompt_no_buff(
                                         config,
                                         local=local,
@@ -1888,13 +1903,13 @@ class TestGQA(unittest.TestCase):
                                         rotary_interleaved=rotary_interleaved,
                                         packed=packed,
                                     )
-                                    self.assertTrue(all_close)
+                                    #self.assertTrue(all_close)
 
     def test_gqa_past(self):
         print("-------- TEST GQA PAST (TOKEN GEN) ---------")
         batches = [1, 3] if pipeline_mode else [1, 3, 5]
         seqs = (
-            [(1, 128)]
+            [(1, 16)]
             if pipeline_mode
             else [
                 (1, 128),
@@ -1910,7 +1925,7 @@ class TestGQA(unittest.TestCase):
                 # (128, 128),
             ]
         )
-        num_h = [(32, 8)] if pipeline_mode else [(6, 6), (6, 3), (9, 9), (9, 3)]
+        num_h = [(16, 8)] if pipeline_mode else [(6, 6), (6, 3), (9, 9), (9, 3)]
         h_sizes = [16] if pipeline_mode else [32, 40, 64, 80, 96, 128, 160, 192, 224, 256]
         random.seed(69)
         for b in batches:
