@@ -91,18 +91,19 @@
                             name: 'webgpu',
                         },
                     ],
-                    graphOptimizationLevel: 'disabled',
+                    graphOptimizationLevel: 'extended',
+                    optimizedModelFilepath: 'opt.onnx'
                 };
                 // const session = await ort.InferenceSession.create('./brainchop/model_5_channels.onnx', option);
-                const session = await ort.InferenceSession.create('./brainchop/model_30_channels.onnx', option);
+                const session = await ort.InferenceSession.create('./brainchop/size64/model_21_channels.onnx', option);
                 // const session = await ort.InferenceSession.create('./brainchop/model_21_channels_104classes.onnx', option);
                 // model_21_channels_104classes
 
-                const shape = [1, 1, 256, 256, 256];
+                const shape = [1, 1, 64, 64, 64];
                 const temp = getFeedInfo("input.1", "float32", 0, shape);
                 //console.log(temp);
                 let dataA = temp[0].get('input.1')[1];
-                let dataTemp = await loadJSON("./onnx-branchchop-case256.jsonc");
+                // let dataTemp = await loadJSON("./onnx-branchchop-input64.jsonc");
                 dataA = dataTemp['data'];
                 const tensorA = new ort.Tensor('float32', dataA, shape);
                 const feeds = { "input.1": tensorA };
@@ -116,7 +117,7 @@
 
 
                 console.log(`data of result tensor 'c': ${dataC[dataC.length - 1]},${dataC[dataC.length - 2]},${dataC[dataC.length - 10]},${dataC[dataC.length - 100]},${dataC[dataC.length - 1000]},${dataC[dataC.length - 10000]},${dataC[dataC.length - 100000]},${dataC[dataC.length - 300000]}`);
-                // saveTemplateAsFile('brainchop-out.json', dataC)
+                saveTemplateAsFile('brainchop-out.json', dataC)
 
                 // untested code
                 let numFiles = 4;
