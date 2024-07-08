@@ -1,0 +1,536 @@
+/**
+ * @license
+ * Copyright 2019 Google LLC. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =============================================================================
+ */
+
+// sampled from [@tensorflow/tfjs] tfjs-backend-webgpu/src/conv2d_mm_webgpu.ts
+//
+// modified to fit the needs of the project
+
+import {DataType} from '../../../../wasm-common';
+import {LOG_DEBUG} from '../../../log';
+import {TensorView} from '../../../tensor-view';
+import {ShapeUtil} from '../../../util';
+import {ProgramInfo, ProgramInputTensorInfoDependency, ProgramUniform} from '../../types';
+import {createTensorShapeVariables, getElementAt, inputVariable, outputVariable, ShaderHelper, tensorTypeToWsglStorageType, UniformsArrayType} from '../common';
+import {ConvAttributes} from '../conv';
+import {appendActivationUniforms, appendActivationUniformsData} from '../fuse-utils';
+
+// import {biasSnippet, typeSnippet} from './activation_util';
+
+export function flatDispatchLayout(shape: readonly number[]) {
+  return {x: shape.map((_, i) => i)};
+}
+
+const arrayProduct = (arr: number[]) => {
+  let product = 1;
+  for (let i = 0; i < arr.length; i++) {
+    product *= arr[i];
+  }
+  return product;
+};
+
+
+export function computeDispatch(
+    layout: {x: number[], y?: number[], z?: number[]}, outputShape: readonly number[],
+    workgroupSize: [number, number, number] = [1, 1, 1],
+    elementsPerThread: [number, number, number] = [1, 1, 1]): [number, number, number] {
+  const [dispatchX, dispatchY, dispatchZ] = [
+    Math.ceil(arrayProduct(layout.x.map(d => outputShape[d])) / (workgroupSize[0] * elementsPerThread[0])),
+    layout.y ? Math.ceil(arrayProduct(layout.y.map(d => outputShape[d])) / (workgroupSize[1] * elementsPerThread[1])) :
+               1,
+    layout.z ? Math.ceil(arrayProduct(layout.z.map(d => outputShape[d])) / (workgroupSize[2] * elementsPerThread[2])) :
+               1
+  ];
+  return [dispatchX, dispatchY, dispatchZ];
+}
+
+
+/**
+ * Computes the information for a forward pass of a 3D convolution/pooling
+ * operation.
+ */
+
+function parse3TupleParam(param: number|[number, number, number]): [number, number, number] {
+  return typeof param === 'number' ? [param, param, param] : param;
+}
+
+/* See https://www.tensorflow.org/api_docs/python/tf/nn/atrous_conv2d
+ * Atrous convolution is equivalent to standard convolution with upsampled
+ * filters with effective_filter_height =
+ * filter_height + (filter_height - 1) * (dilation - 1)
+ * and effective_filter_width =
+ * filter_width + (filter_width - 1) * (dilation - 1),
+ * produced by inserting dilation - 1 zeros along consecutive elements across
+ * the filters' spatial dimensions.
+ * When there is a dilation, this converts a filter dimension to the
+ * effective filter dimension, so it can be used in a standard convolution.
+ */
+function getEffectiveFilterSize(filterSize: number, dilation: number) {
+  if (dilation <= 1) {
+    return filterSize;
+  }
+
+  return filterSize + (filterSize - 1) * (dilation - 1);
+}
+
+/**
+ * Rounds a value depending on the rounding mode
+ * @param value
+ * @param roundingMode A string from: 'ceil', 'round', 'floor'. If none is
+ *     provided, it will default to truncate.
+ */
+function round(value: number, roundingMode?: 'floor'|'round'|'ceil') {
+  if (!roundingMode) {
+    return Math.trunc(value);
+  }
+  switch (roundingMode) {
+    case 'round':
+      // used for Caffe Conv
+      return Math.round(value);
+    case 'ceil':
+      // used for Caffe Pool
+      return Math.ceil(value);
+    case 'floor':
+      return Math.floor(value);
+    default:
+      throw new Error(`Unknown roundingMode ${roundingMode}`);
+  }
+}
+
+function computeOutputShape4D(
+    inShape: [number, number, number, number], filterShape: [number, number, number], outChannels: number,
+    strides: [number, number, number], zeroPad?: number,
+    roundingMode?: 'floor'|'round'|'ceil'): [number, number, number, number] {
+  if (zeroPad == null) {
+    zeroPad = computeDefaultPad(inShape, filterShape[0], strides[0]);
+  }
+  const outShape: [number, number, number, number] = [0, 0, 0, outChannels];
+  for (let index = 0; index < 3; index++) {
+    if (inShape[index] + 2 * zeroPad >= filterShape[index]) {
+      outShape[index] = round((inShape[index] - filterShape[index] + 2 * zeroPad) / strides[index] + 1, roundingMode);
+    }
+  }
+  return outShape;
+}
+
+export function computeDefaultPad(
+    inputShape: [number, number]|[number, number, number, number], fieldSize: number, stride: number,
+    dilation = 1): number {
+  const effectiveFieldSize = getEffectiveFilterSize(fieldSize, dilation);
+  return Math.floor((inputShape[0] * (stride - 1) - stride + effectiveFieldSize) / 2);
+}
+
+function get3DPadAndOutInfo(
+    pad: number|string, inDepth: number, inHeight: number, inWidth: number, strideDepth: number, strideHeight: number,
+    strideWidth: number, filterDepth: number, filterHeight: number, filterWidth: number,
+    roundingMode?: 'floor'|'round'|
+    'ceil'): {padInfo: PadInfo3D, outDepth: number, outHeight: number, outWidth: number} {
+  let padInfo: PadInfo3D;
+  let outDepth: number;
+  let outHeight: number;
+  let outWidth: number;
+
+  if (pad === 'valid') {
+    pad = 0;
+  }
+
+  if (typeof pad === 'number') {
+    const padType = (pad === 0) ? 'VALID' : 'NUMBER';
+    padInfo = {top: pad, bottom: pad, left: pad, right: pad, front: pad, back: pad, type: padType};
+    const outShape = computeOutputShape4D(
+        [inDepth, inHeight, inWidth, 1], [filterDepth, filterHeight, filterWidth], 1,
+        [strideDepth, strideHeight, strideWidth], pad, roundingMode);
+    outDepth = outShape[0];
+    outHeight = outShape[1];
+    outWidth = outShape[2];
+  } else if (pad === 'same') {
+    outDepth = Math.ceil(inDepth / strideDepth);
+    outHeight = Math.ceil(inHeight / strideHeight);
+    outWidth = Math.ceil(inWidth / strideWidth);
+    const padAlongDepth = (outDepth - 1) * strideDepth + filterDepth - inDepth;
+    const padAlongHeight = (outHeight - 1) * strideHeight + filterHeight - inHeight;
+    const padAlongWidth = (outWidth - 1) * strideWidth + filterWidth - inWidth;
+    const front = Math.floor(padAlongDepth / 2);
+    const back = padAlongDepth - front;
+    const top = Math.floor(padAlongHeight / 2);
+    const bottom = padAlongHeight - top;
+    const left = Math.floor(padAlongWidth / 2);
+    const right = padAlongWidth - left;
+
+    padInfo = {top, bottom, left, right, front, back, type: 'SAME'};
+  } else {
+    throw Error(`Unknown padding parameter: ${pad}`);
+  }
+  return {padInfo, outDepth, outHeight, outWidth};
+}
+
+type PadType = 'SAME'|'VALID'|'NUMBER'|'EXPLICIT';
+
+export type PadInfo3D = {
+  top: number,
+  left: number,
+  right: number,
+  bottom: number,
+  front: number,
+  back: number,
+  type: PadType
+};
+
+/**
+ * Information about the forward pass of a 3D convolution/pooling operation.
+ * It includes input and output shape, strides, filter size and padding
+ * information.
+ */
+export type Conv3DInfo = {
+  batchSize: number,
+  inDepth: number,
+  inHeight: number,
+  inWidth: number,
+  inChannels: number,
+  outDepth: number,
+  outHeight: number,
+  outWidth: number,
+  outChannels: number,
+  dataFormat: 'channelsFirst'|'channelsLast',
+  strideDepth: number,
+  strideHeight: number,
+  strideWidth: number,
+  dilationDepth: number,
+  dilationHeight: number,
+  dilationWidth: number,
+  filterDepth: number,
+  filterHeight: number,
+  filterWidth: number,
+  effectiveFilterDepth: number,
+  effectiveFilterHeight: number,
+  effectiveFilterWidth: number,
+  padInfo: PadInfo3D,
+  inShape: [number, number, number, number, number],
+  outShape: [number, number, number, number, number],
+  filterShape: [number, number, number, number, number]
+};
+
+export function computeConv3DInfo(
+    inShape: [number, number, number, number, number], filterShape: [number, number, number, number, number],
+    strides: number|[number, number, number], dilations: number|[number, number, number], pad: number|string,
+    depthwise = false, dataFormat: 'channelsFirst'|'channelsLast' = 'channelsLast',
+    roundingMode?: 'floor'|'round'|'ceil'): Conv3DInfo {
+  let [batchSize, inDepth, inHeight, inWidth, inChannels] = [-1, -1, -1, -1, -1];
+  if (dataFormat === 'channelsLast') {
+    [batchSize, inDepth, inHeight, inWidth, inChannels] = inShape;
+  } else if (dataFormat === 'channelsFirst') {
+    [batchSize, inChannels, inDepth, inHeight, inWidth] = inShape;
+  } else {
+    throw new Error(`Unknown dataFormat ${dataFormat}`);
+  }
+
+  const [filterDepth, filterHeight, filterWidth, , filterChannels] = filterShape;
+  const [strideDepth, strideHeight, strideWidth] = parse3TupleParam(strides);
+  const [dilationDepth, dilationHeight, dilationWidth] = parse3TupleParam(dilations);
+
+  const effectiveFilterDepth = getEffectiveFilterSize(filterDepth, dilationDepth);
+  const effectiveFilterHeight = getEffectiveFilterSize(filterHeight, dilationHeight);
+  const effectiveFilterWidth = getEffectiveFilterSize(filterWidth, dilationWidth);
+  const {padInfo, outDepth, outHeight, outWidth} = get3DPadAndOutInfo(
+      pad, inDepth, inHeight, inWidth, strideDepth, strideHeight, strideWidth, effectiveFilterDepth,
+      effectiveFilterHeight, effectiveFilterWidth, roundingMode);
+
+  const outChannels = depthwise ? filterChannels * inChannels : filterChannels;
+
+  let outShape: [number, number, number, number, number] = [0, 0, 0, 0, 0];
+  if (dataFormat === 'channelsFirst') {
+    outShape = [batchSize, outChannels, outDepth, outHeight, outWidth];
+  } else if (dataFormat === 'channelsLast') {
+    outShape = [batchSize, outDepth, outHeight, outWidth, outChannels];
+  }
+
+  return {
+    batchSize,
+    dataFormat,
+    inDepth,
+    inHeight,
+    inWidth,
+    inChannels,
+    outDepth,
+    outHeight,
+    outWidth,
+    outChannels,
+    padInfo,
+    strideDepth,
+    strideHeight,
+    strideWidth,
+    filterDepth,
+    filterHeight,
+    filterWidth,
+    effectiveFilterDepth,
+    effectiveFilterHeight,
+    effectiveFilterWidth,
+    dilationDepth,
+    dilationHeight,
+    dilationWidth,
+    inShape,
+    outShape,
+    filterShape
+  };
+}
+
+
+export const createConv3DNaiveProgramInfo =
+    (inputs: readonly TensorView[], attributes: ConvAttributes, outputShape: readonly number[],
+     filterDims: readonly number[], pads: readonly number[], hasBias: boolean): ProgramInfo => {
+      const isChannelsLast = attributes.format === 'NHWC';
+      const inChannels = isChannelsLast ? inputs[0].dims[3] : inputs[0].dims[1];
+      // const batchSize = outputShape[0];
+      // const outWidth = isChannelsLast ? outputShape[2] : outputShape[3];
+      // const outHeight = isChannelsLast ? outputShape[1] : outputShape[2];
+      const outChannels = isChannelsLast ? outputShape[3] : outputShape[1];
+      // TODO: enable vec4 for NCHW
+      const isVec4 = isChannelsLast && (inChannels % 4 === 0 || inChannels % 3 === 0) && outChannels % 4 === 0;
+
+      // TODO: fine tune size
+      // const dispatchX = isChannelsLast ? outChannels : outWidth * outHeight;
+      // const dispatchY = isChannelsLast ? outWidth * outHeight : outChannels;
+      const workGroupSize: [number, number, number] = [64, 1, 1];
+      // const elementsPerThread = [1, 1, 1];// : [4, 4, 1];
+      /*
+      const dispatch = [
+        Math.ceil(dispatchX / workGroupSize[0] / elementsPerThread[0]),
+        Math.ceil(dispatchY / workGroupSize[1] / elementsPerThread[1]),
+        Math.ceil(batchSize / workGroupSize[2] / elementsPerThread[2])
+      ];
+      */
+
+      const dispatchLayout = flatDispatchLayout(outputShape);
+      const dispatch = computeDispatch(dispatchLayout, outputShape, workGroupSize);
+
+
+      LOG_DEBUG('verbose', () => `[conv2d_mm_webgpu] dispatch = ${dispatch}`);
+
+      const innerElementSize = isVec4 ? (isChannelsLast && inChannels % 4 !== 0 ? 3 : 4) : 1;
+      const outputSize = ShapeUtil.size(outputShape);
+
+      // const programUniforms: ProgramUniform[] = [
+      //  {type: DataType.int32, data: [attributes.pads[0], attributes.pads[1]]},
+      //  {type: DataType.int32, data: attributes.strides}, {type: DataType.int32, data: attributes.dilations}
+      //];
+      // util.sizeFromShape(program.outputShape);
+      // TODO: COnstants
+      const programUniforms: ProgramUniform[] = [
+        {type: DataType.uint32, data: outputSize}, {type: DataType.uint32, data: filterDims},
+        {type: DataType.uint32, data: pads}, {type: DataType.uint32, data: attributes.strides},
+        {type: DataType.uint32, data: attributes.dilations}
+      ];
+      console.log('xxx ' + JSON.stringify(attributes));
+      appendActivationUniformsData(attributes, programUniforms);
+      programUniforms.push(...createTensorShapeVariables(inputs[0].dims, inputs[1].dims));
+      const inputDependencies: ProgramInputTensorInfoDependency[] = ['rank', 'rank'];
+      if (hasBias) {
+        programUniforms.push(...createTensorShapeVariables(inputs[2].dims));
+        inputDependencies.push('rank');
+      }
+      programUniforms.push(...createTensorShapeVariables(outputShape));
+
+      const getShaderSource = (shaderHelper: ShaderHelper) => {
+        const uniforms: UniformsArrayType = [
+          {name: 'output_size', type: 'u32'}, {name: 'filter_dims', type: 'u32', length: 3},
+          {name: 'pads', type: 'u32', length: 3}, {name: 'strides', type: 'u32', length: 3},
+          {name: 'dilations', type: 'u32', length: 3}
+        ];
+        appendActivationUniforms(attributes, uniforms);
+
+        // TODO: support component 2, 3.
+        const components = isVec4 ? 4 : 1;
+        const t = tensorTypeToWsglStorageType(inputs[0].dataType);
+        let declareFunctions = `
+      fn setOutputAtIndex(flatIndex : u32, value : ${isVec4 ? `vec4<${t}>` : t}) {
+        result[flatIndex] = ${isVec4 ? `vec4<${t}>` : t}(value);
+      }
+      fn setOutputAtCoords(d0 : i32, d1 : i32, d2 : i32, d3 : i32, value : ${isVec4 ? `vec4<${t}>` : t}) {
+        let flatIndex = getOutputIndexFromCoords(vec4<i32>(d0, d1, d2, d3));
+        setOutputAtIndex(flatIndex ${isVec4 ? '/ 4' : ''}, value);
+      }`;
+        const x = inputVariable(
+            'x', inputs[0].dataType, inputs[0].dims.length, innerElementSize === 3 ? 1 : innerElementSize);
+        const w = inputVariable('W', inputs[1].dataType, inputs[1].dims.length, components);
+        const inputVariables = [x, w];
+        const output = outputVariable('result', inputs[0].dataType, outputShape.length, components);
+        if (hasBias) {
+          const bias = inputVariable('bias', inputs[2].dataType, inputs[2].dims.length, components);
+          inputVariables.push(bias);
+          declareFunctions += `
+        fn getBiasByOutputCoords(coords : vec4<i32>) -> ${isVec4 ? `vec4<${t}>` : t} {
+          return bias[coords.${isChannelsLast ? 'w' : 'y'}${isVec4 ? '/ 4' : ''}];
+        }`;
+        }
+
+        return `
+            struct vec5 {x: i32, y: i32, z: i32, w: i32, u: i32};
+            // fn getOutputCoords() -> vec5{
+            //   let globalIndex = getGlobalIndex();
+            //   return getCoordsFromIndex(globalIndex);
+            // }
+
+            // fn getCoordsFromIndex(index : i32) -> vec5 {
+            //   var index2 = index;let d0 = index2 / uniforms.result_strides.x; index2 = index2 - d0 * uniforms.result_strides.x;let d1 = index2 / uniforms.result_strides.y; index2 = index2 - d1 * uniforms.result_strides.y;let d2 = index2 / uniforms.result_strides.z; index2 = index2 - d2 * uniforms.result_strides.z;let d3 = index2 / uniforms.result_strides.w; let d4 = index2 - d3 * uniforms.result_strides.w;
+            //   return vec5(d0,d1,d2,d3,d4);
+            // }
+            fn getIndexFromCoords5D(coords : vec5, shape : vec5) -> i32 {
+              let shapeStrides: vec5 = vec5(shape.y * shape.z * shape.w * shape.u, shape.z * shape.w * shape.u, shape.w * shape.u, shape.u, 1);
+              return coords.x*shapeStrides.x + coords.y*shapeStrides.y + coords.z*shapeStrides.z + coords.w*shapeStrides.w + coords.u*shapeStrides.u;
+            }
+            // fn getX(d0 : i32, d1 : i32, d2 : i32, d3 : i32, d4 : i32) -> f32 {
+            //   return f32(x[getIndexFromCoords5D(vec5(d0,d1,d2,d3,d4),
+            //     uniforms.x_shape)]);
+            // }
+            // fn getW(d0 : i32, d1 : i32, d2 : i32, d3 : i32, d4 : i32) -> f32 {
+            //   return f32(W[getIndexFromCoords5D(vec5(d0,d1,d2,d3,d4),
+            //     uniforms.w_shape)]);
+            // }
+            fn setOutputAtIndex(flatIndex : u32, value : f32) {
+              result[flatIndex] = f32(value);
+            }
+
+            fn getX(d0 : u32, d1 : u32, d2 : u32, d3 : u32, d4 : u32) -> f32 {
+              let aIndices = array<u32, 5>(d0,d1,d2,d3,d4);
+              return ${x.getByIndices('aIndices')};
+            }
+            fn getW(d0 : u32, d1 : u32, d2 : u32, d3 : u32, d4 : u32) -> f32 {
+              let aIndices = array<u32, 5>(d0,d1,d2,d3,d4);
+              return ${w.getByIndices('aIndices')};
+            }
+
+          ${shaderHelper.registerUniforms(uniforms).declareVariables(...inputVariables, output)}
+          ${shaderHelper.mainStart()}
+          ${shaderHelper.guardAgainstOutOfBoundsWorkgroupSizes('uniforms.output_size')}
+            //if (index < uniforms.output_size) {
+              let coords = ${output.offsetToIndices('global_idx')};
+              //let coords = getCoordsFromIndex(global_idx); //getOutputCoords();
+              let batch = ${getElementAt('coords', 0, x.rank)};// coords.x;
+              let d2 = ${getElementAt('coords', x.rank - 1, x.rank)};//coords.u;
+
+              // let xFRCCorner = vec3<i32>(coords.y, coords.z, coords.w) * uniforms.strides - uniforms.pads;
+              let xFRCCorner = vec3<u32>(${getElementAt('coords', 1, x.rank)}, ${getElementAt('coords', 2, x.rank)}, ${
+            getElementAt('coords', 3, x.rank)}) * uniforms.strides - uniforms.pads;
+              let xFCorner = xFRCCorner.x;
+              let xRCorner = xFRCCorner.y;
+              let xCCorner = xFRCCorner.z;
+              let xShapeU = ${getElementAt('uniforms.x_shape', 4, x.rank)};
+              let xShapeY = ${getElementAt('uniforms.x_shape', 1, x.rank)};
+              let xShapeZ = ${getElementAt('uniforms.x_shape', 2, x.rank)};
+              let xShapeW = ${getElementAt('uniforms.x_shape', 3, x.rank)};
+              let inputDepthNearestVec4 = (xShapeU / 4) * 4;
+              let inputDepthVec4Remainder = xShapeU % 4;
+
+              var dotProd = 0.0;
+              for (var wF = 0u; wF < uniforms.filter_dims[0]; wF++) {
+                let xF = xFCorner + wF * uniforms.dilations[0];
+                if (xF < 0 || xF >= xShapeY) {
+                  continue;
+                }
+
+                for (var wR = 0u; wR < uniforms.filter_dims[1]; wR++) {
+                  let xR = xRCorner + wR * uniforms.dilations[1];
+                  if (xR < 0 || xR >= xShapeZ) {
+                    continue;
+                  }
+
+                  for (var wC = 0u; wC < uniforms.filter_dims[2]; wC++) {
+                    let xC = xCCorner + wC * uniforms.dilations[2];
+                    if (xC < 0 || xC >= xShapeW) {
+                      continue;
+                    }
+
+                    for (var d1 = 0u; d1 < inputDepthNearestVec4; d1 += 4) {
+
+                      //{x.getByIndices('aIndices')}
+                      // var aIndices = array<u32, 5>(batch, xF, xR, xC, d1);
+                      // let x0 = {x.getByIndices('aIndices')};
+                      // aIndices = array<u32, 5>(batch, xF, xR, xC, d1 + 1);
+                      // let x1 = {x.getByIndices('aIndices')};
+                      // aIndices = array<u32, 5>(batch, xF, xR, xC, d1 + 2);
+                      // let x2 = {x.getByIndices('aIndices')};
+                      // aIndices = array<u32, 5>(batch, xF, xR, xC, d1 + 3);
+                      // let x3 = {x.getByIndices('aIndices')};
+                      let xValues = vec4<f32>(
+                        getX(batch, xF, xR, xC, d1),
+                        getX(batch, xF, xR, xC, d1 + 1),
+                        getX(batch, xF, xR, xC, d1 + 2),
+                        getX(batch, xF, xR, xC, d1 + 3)
+                      );
+                      // let xValues = vec4<f32>(x0,x1,x2, x3);
+                      let wValues = vec4<f32>(
+                        getW(wF, wR, wC, d1, d2),
+                        getW(wF, wR, wC, d1 + 1, d2),
+                        getW(wF, wR, wC, d1 + 2, d2),
+                        getW(wF, wR, wC, d1 + 3, d2)
+                      );
+
+                      // var aIndices = array<u32, 5>(wF, wR, wC, d1, d2);
+                      // let w0 = {x.getByIndices('aIndices')};
+                      // aIndices = array<u32, 5>(wF, wR, wC, d1 + 1, d2);
+                      // let w1 = {x.getByIndices('aIndices')};
+                      // aIndices = array<u32, 5>(wF, wR, wC, d1 + 2, d2);
+                      // let w2 = {x.getByIndices('aIndices')};
+                      // aIndices = array<u32, 5>(wF, wR, wC, d1 + 3, d2);
+                      // let w3 = {x.getByIndices('aIndices')};
+                      // let xValues = vec4<f32>(w0,w1,w2, w3);
+                      dotProd += dot(xValues, wValues);
+                    }
+
+                    if (inputDepthVec4Remainder == 1) {
+                      dotProd += getX(batch, xF, xR, xC, inputDepthNearestVec4) *
+                        getW(wF, wR, wC, inputDepthNearestVec4, d2);
+                    } else if (inputDepthVec4Remainder == 2) {
+                      let xValues = vec2<f32>(
+                        getX(batch, xF, xR, xC, inputDepthNearestVec4),
+                        getX(batch, xF, xR, xC, inputDepthNearestVec4 + 1)
+                      );
+                      let wValues = vec2<f32>(
+                        getW(wF, wR, wC, inputDepthNearestVec4, d2),
+                        getW(wF, wR, wC, inputDepthNearestVec4 + 1, d2)
+                      );
+                      dotProd += dot(xValues, wValues);
+                    } else if (inputDepthVec4Remainder == 3) {
+                      let xValues = vec3<f32>(
+                        getX(batch, xF, xR, xC, inputDepthNearestVec4),
+                        getX(batch, xF, xR, xC, inputDepthNearestVec4 + 1),
+                        getX(batch, xF, xR, xC, inputDepthNearestVec4 + 2)
+                      );
+                      let wValues = vec3<f32>(
+                        getW(wF, wR, wC, inputDepthNearestVec4, d2),
+                        getW(wF, wR, wC, inputDepthNearestVec4 + 1, d2),
+                        getW(wF, wR, wC, inputDepthNearestVec4 + 2, d2)
+                      );
+                      dotProd += dot(xValues, wValues);
+                    }
+                  }
+                }
+              }
+              setOutputAtIndex(global_idx, dotProd);
+            //}
+          }`;
+      };
+      return {
+        name: 'Conv3DNaive',
+        shaderCache: {hint: `${attributes.cacheKey};${innerElementSize};${isVec4}`, inputDependencies},
+        getRunData: () => ({
+          outputs: [{dims: outputShape, dataType: inputs[0].dataType}],
+          dispatchGroup: {x: dispatch[0], y: dispatch[1], z: dispatch[2]},
+          programUniforms,
+        }),
+        getShaderSource
+      };
+    };

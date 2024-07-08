@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <title>ONNX Runtime JavaScript examples: Quick Start - Web (using bundler)</title>
+</header>
+
+<body>
+    <!-- consume a single file bundle ./node_modules/onnxruntime-web/dist/ort.webgpu.min.js  ./web/dist/ort.webgpu.min.js-->
+    <!--script src="./node_modules/onnxruntime-web/dist/ort.webgpu.min.js"></script-->
+    <script src="./web_r_fuse/dist/ort.all.js"></script>
+    <script src="./models.js"></script>
+    <script>
+        //models.js globals.
+        let feedsInfo = [];
+        let session;
+        let warmupTimes = 1;
+        let runTimes = 0;
+        ort.env.logLevel = 'verbose';
+        ort.env.debug = true;
+        function getFeeds(modelName) {
+            let feeds = {};
+            getFeedsInfo(modelName);
+            for (const [feed, [type, data, dims, bufferSize]] of feedsInfo[0]) {
+
+                feeds[feed] = new ort.Tensor(type, data, dims);
+            }
+            return feeds;
+        }
+
+        async function main() {
+            // set option
+            const option = {
+                executionProviders: [
+                    {
+                        name: 'webgpu',
+                    },
+                ],
+                graphOptimizationLevel: 'all',
+                optimizedModelFilePath: 'opt.onnx'
+            };
+
+            const modelName = 'mobilenetv2-12-f16';
+            //const modelName = 'mobilenetv2-12'
+            const modelPath = './models/' + modelName + '.onnx';
+            session = await ort.InferenceSession.create(modelPath, option);
+
+            let feeds = getFeeds(modelName);
+            // feed inputs and run
+            console.log("before run");
+            const results = await session.run(feeds);
+            console.log("after run");
+            console.log(results.output.cpuData);
+
+        }
+
+        main();
+    </script>
+</body>
+
+</html>
