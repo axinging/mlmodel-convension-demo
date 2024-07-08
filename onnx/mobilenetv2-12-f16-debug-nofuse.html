@@ -36,7 +36,7 @@
                     },
                 ],
                 graphOptimizationLevel: 'all',
-                optimizedModelFilePath: 'opt.onnx'
+                optimizedModelFilePath1: 'opt.onnx'
             };
 
             const modelName = 'mobilenetv2-12-f16';
@@ -50,7 +50,7 @@
             const results = await session.run(feeds);
             console.log("after run");
             console.log(results.output.cpuData);
-
+            download(JSON.stringify(results), modelName + '-nofuse.json');
         }
 
         main();
