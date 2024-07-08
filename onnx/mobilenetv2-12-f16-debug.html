@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <title>ONNX Runtime JavaScript examples: Quick Start - Web (using bundler)</title>
+</header>
+
+<body>
+    <!-- consume a single file bundle ./node_modules/onnxruntime-web/dist/ort.webgpu.min.js  ./web/dist/ort.webgpu.min.js-->
+    <!--script src="./node_modules/onnxruntime-web/dist/ort.webgpu.min.js"></script-->
+    <script src="./web_r_fuse/dist/ort.all.js"></script>
+    <script src="./models.js"></script>
+    <script>
+        //models.js globals.
+        let feedsInfo = [];
+        let session;
+        let warmupTimes = 1;
+        let runTimes = 0;
+        ort.env.logLevel = 'verbose';
+        ort.env.debug = true;
+        function getFeeds(modelName) {
+            let feeds = {};
+            getFeedsInfo(modelName);
+            for (const [feed, [type, data, dims, bufferSize]] of feedsInfo[0]) {
+
+                feeds[feed] = new ort.Tensor(type, data, dims);
+            }
+            return feeds;
+        }
+
+        async function main() {
+            // set option
+            const option = {
+                executionProviders: [
+                    {
+                        name: 'webgpu',
+                    },
+                ],
+                graphOptimizationLevel: optLevel,
+                optimizedModelFilePath1: 'opt.onnx'
+            };
+
+            // const modelName = 'modified_modified_modified_mf12-fuse-clamp_cv4only';
+            // const modelName = 'modified_mf12-fuse-clamp_cv4';
+            // const modelName = 'modified_modified_mf12-fuse-clamp_6';
+            // 
+            //const modelName = 'modified_mf12-fuse-clamp_6';
+            const wh = 4;//const wh = getValue('w')
+            const modelName = 'modified_modified_mobilenetv2-12-f16-o-conv5only'+wh.toString();
+            const modelPath = './models/' + modelName + '.onnx';
+            session = await ort.InferenceSession.create(modelPath, option);        
+
+            const isFromInput = false;
+            const feedData = await loadJson("./modified_mobilenetv2-12-f16-o-conv4-fuse.json");
+            const nodeName = isFromInput ? '': 'Conv_4';
+            const dataFromFeedData = isFromInput? null: Uint16Array.from(Object.values(feedData[480].cpuData));
+            const value  = getValue('value');
+            const feeds = getFeedForTest56(nodeName, wh, value);
+
+            // feed inputs and run
+            console.log("before run");
+            const results = await session.run(feeds);
+            console.log("after run");
+            console.log(JSON.stringify(results[325].cpuData));
+            download(JSON.stringify(results), modelName + '-size' +wh.toString()+'-value' +value.toString()+ '-fuse.json');
+            console.log('ortend')
+
+        }
+
+
+
+        main();
+    </script>
+</body>
+
+</html>
