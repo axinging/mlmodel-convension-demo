@@ -7,7 +7,7 @@
 <body>
     <!-- consume a single file bundle ./node_modules/onnxruntime-web/dist/ort.webgpu.min.js  ./web/dist/ort.webgpu.min.js-->
     <!--script src="./node_modules/onnxruntime-web/dist/ort.webgpu.min.js"></script-->
-    <script src="./web_r_fuse/dist/ort.all.js"></script>
+    <script src="./web_r_fuse_nonative/dist/ort.all.js"></script>
     <script src="./models.js"></script>
     <script>
         //models.js globals.
@@ -68,7 +68,7 @@
             const startValue = getValue('startValue');
             const endValue = getValue('endValue');
 
-            for (let value = startValue; value < endValue; value++) {
+            for (let value = startValue; value <= endValue; value++) {
                 const feeds = getFeedForTest56(nodeName, shape, value);
 
                 // feed inputs and run
@@ -77,7 +77,7 @@
                 download(JSON.stringify(results), modelName + '-size' + shapeStr + '-value' + value.toString() + '-fuse.json');
                 console.log('ortend');
                 sleepFor(100);
-                return;
+                //return;
             }
         }
 
