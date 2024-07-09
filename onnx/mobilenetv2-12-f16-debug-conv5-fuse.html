@@ -70,10 +70,11 @@
 
             for (let value = startValue; value <= endValue; value++) {
                 const feeds = getFeedForTest56(nodeName, shape, value);
+                console.log("Input: " + JSON.stringify(feeds));
 
                 // feed inputs and run
                 const results = await session.run(feeds);
-                console.log(JSON.stringify(results[325].cpuData));
+                console.log("Outputs: "+ JSON.stringify(results[325].cpuData));
                 download(JSON.stringify(results), modelName + '-size' + shapeStr + '-value' + value.toString() + '-fuse.json');
                 console.log('ortend');
                 sleepFor(100);
