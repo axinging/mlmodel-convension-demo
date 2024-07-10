@@ -32,7 +32,7 @@
 
         function unloadORT(mode) {
 
-            let urls = mode == "nonfuse" ? [
+            let urls = mode == "nofuse" ? [
                 './web_r_nofuse/dist/ort.all.js',
             ] : [
                 './web_r_fuse/dist/ort.all.js',
@@ -47,11 +47,12 @@
 
         }
         async function loadORT(mode) {
-            let urls = mode == "nonfuse" ? [
+            let urls = mode == "nofuse" ? [
                 './web_r_nofuse/dist/ort.all.js',
             ] : [
                 './web_r_fuse/dist/ort.all.js',
             ];
+            console.log(urls);
             for (let url of urls) {
                 await loadScript(url);
             }
@@ -141,11 +142,9 @@
             const product = urlParams.get(name);
             return product;
         }
-        async function main() {
 
+        async function dynamicInference(mode) {
             const testSet = ['crab', 'cat', 'magpie', 'jay', 'axolotl']
-            //const testSet = ['crab'];
-            let mode = 'nonfuse';// getValue('mode');
             console.log("mode: " + mode);
             await loadORT(mode);
             //ort.env.logLevel = 'verbose';
@@ -155,16 +154,17 @@
                 await inference(item)
             }
             unloadORT(mode);
-
-            mode = 'fuse';// getValue('mode');
-            console.log("mode: " + mode);
-            await loadORT(mode);
-            //ort.env.logLevel = 'verbose';
-            //ort.env.debug = true;
-            for (const item of testSet) {
-                await inference(item)
+        }
+        async function main() {
+            if (getValue('mode') == null) {
+                console.error("This may got different results even in the same mode");
+                let mode = 'nofuse';
+                await dynamicInference(mode);
+                mode = 'nofuse';
+                await dynamicInference(mode);
+            } else {
+                await dynamicInference(getValue('mode'));
             }
-            unloadORT(mode);
         }
 
         main();
