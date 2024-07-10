@@ -30,13 +30,28 @@
             })
         }
 
-        async function loadORT(mode) {
-            let urls = mode === 'nofuse' ? [
+        function unloadORT(mode) {
+
+            let urls = mode == "nonfuse" ? [
                 './web_r_nofuse/dist/ort.all.js',
             ] : [
                 './web_r_fuse/dist/ort.all.js',
             ];
+            for (let filename of urls) {
+                var tags = document.getElementsByTagName('script');
+                for (var i = tags.length; i >= 0; i--) { //search backwards within nodelist for matching elements to remove
+                    if (tags[i] && tags[i].getAttribute('src') != null && tags[i].getAttribute('src').indexOf(filename) != -1)
+                        tags[i].parentNode.removeChild(tags[i]); //remove element by calling parentNode.removeChild()
+                }
+            }
 
+        }
+        async function loadORT(mode) {
+            let urls = mode == "nonfuse" ? [
+                './web_r_nofuse/dist/ort.all.js',
+            ] : [
+                './web_r_fuse/dist/ort.all.js',
+            ];
             for (let url of urls) {
                 await loadScript(url);
             }
@@ -127,16 +142,29 @@
             return product;
         }
         async function main() {
-            const mode = getValue('mode');
+
+            const testSet = ['crab', 'cat', 'magpie', 'jay', 'axolotl']
+            //const testSet = ['crab'];
+            let mode = 'nonfuse';// getValue('mode');
             console.log("mode: " + mode);
             await loadORT(mode);
             //ort.env.logLevel = 'verbose';
             //ort.env.debug = true;
-            const testSet = ['crab', 'cat', 'magpie', 'jay', 'axolotl']
-            // const testSet = ['crab'];
+
             for (const item of testSet) {
                 await inference(item)
             }
+            unloadORT(mode);
+
+            mode = 'fuse';// getValue('mode');
+            console.log("mode: " + mode);
+            await loadORT(mode);
+            //ort.env.logLevel = 'verbose';
+            //ort.env.debug = true;
+            for (const item of testSet) {
+                await inference(item)
+            }
+            unloadORT(mode);
         }
 
         main();
