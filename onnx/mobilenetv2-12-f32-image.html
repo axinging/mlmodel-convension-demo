@@ -51,7 +51,6 @@
         }
 
         function getClass(data) {
-            const classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck'];
             const maxProb = Math.max(...data);
             return [IMAGENET_CLASSES[data.indexOf(maxProb)], maxProb];
         }
