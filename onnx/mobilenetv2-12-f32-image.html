@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <title>ONNX Runtime JavaScript examples: Quick Start - Web (using bundler)</title>
+</header>
+
+<body>
+    <canvas id="input-canvas" , width=224, height=224></canvas>
+    <script src="./web_r_nofuse/dist/ort.all.js"></script>
+    <script src="./imagenet_classes.js"></script>
+    <script>
+        //models.js globals.
+        let feedsInfo = [];
+        let session;
+        let warmupTimes = 1;
+        let runTimes = 0;
+        ort.env.logLevel = 'verbose';
+        ort.env.debug = true;
+        function getFeeds(modelName) {
+            let feeds = {};
+            getFeedsInfo(modelName);
+            for (const [feed, [type, data, dims, bufferSize]] of feedsInfo[0]) {
+
+                feeds[feed] = new ort.Tensor(type, data, dims);
+            }
+            return feeds;
+        }
+        async function loadImage(url) {
+            return new Promise(r => { let i = new Image(); i.onload = (() => r(i)); i.src = url; });
+        }
+        // normalize(src: Uint8ClampedArray, width: number, height: number): Float32Array {
+        function normalize(src, width, height) {
+            const dst = new Float32Array(width * height * 3);
+            const transforms = [[0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]];
+            const step = width * height;
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const [di, si] = [y * width + x, (y * width + x) * 4];
+                    dst[di] = ((src[si + 0] / 255) - transforms[0][0]) / transforms[1][0];
+                    dst[di + step] = ((src[si + 1] / 255) - transforms[0][1]) / transforms[1][1];
+                    dst[di + step * 2] = ((src[si + 2] / 255) - transforms[0][2]) / transforms[1][2];
+                }
+            }
+            return dst;
+        }
+
+        function softmax(data) {
+            const max = Math.max(...data);
+            const d = data.map(y => Math.exp(y - max)).reduce((a, b) => a + b);
+            return data.map((value, index) => Math.exp(value - max) / d);
+        }
+
+        function getClass(data) {
+            const classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck'];
+            const maxProb = Math.max(...data);
+            return [IMAGENET_CLASSES[data.indexOf(maxProb)], maxProb];
+        }
+
+        function getTensorFromImage() {
+            const element = document.getElementById("input-canvas");
+            const ctx = element.getContext("2d");
+            const preprocessedData = this.preprocess(ctx);
+            const imageData = ctx.getImageData(
+                0,
+                0,
+                ctx.canvas.width,
+                ctx.canvas.height
+            );
+            const { data, width, height } = imageData;
+        }
+
+        async function main() {
+
+            let image = await loadImage("./images/crab.jpg");
+            const element = document.getElementById("input-canvas");
+            const ctx = element.getContext("2d");
+            const [w, h] = [ctx.canvas.width, ctx.canvas.height];
+            ctx.drawImage(image, 0, 0, w, h);
+            const imageData = ctx.getImageData(0, 0, w, h);
+
+            const { data, width, height } = imageData;
+            const processed = normalize(data, width, height);
+            console.log(processed);
+            const tensor = new ort.Tensor("float32", processed, [1, 3, width, height]);
+
+            // set option
+            const option = {
+                executionProviders: [
+                    {
+                        name: 'webgpu',
+                    },
+                ],
+                graphOptimizationLevel: 'all',
+                optimizedModelFilePath1: 'opt.onnx'
+            };
+
+            const modelName = 'mobilenetv2-12';
+            // mobilenetv2-12-f16
+            //const modelName = 'mobilenetv2-12'
+            const modelPath = './models/' + modelName + '.onnx';
+            session = await ort.InferenceSession.create(modelPath, option);
+
+            let feeds = { input: tensor };
+            const result = await session.run(feeds);
+            const predicted = softmax((result.output.data));
+            const label = getClass(predicted).toString();
+            console.log(label);
+        }
+
+        main();
+    </script>
+</body>
+
+</html>

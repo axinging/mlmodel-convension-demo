@@ -53,9 +53,13 @@
             console.log(shape);
             // var num = 123456;
             const shapeIsArray = Array.isArray(shape);
-            console.log(shapeIsArray);
-            const shapeStr = shape.toString().replaceAll(',', '_')
-            const modelName = 'modified_modified_mobilenetv2-12-f16-o-conv5only' + shapeStr;
+            //console.log(shapeIsArray);
+            const shapeStr = shape.toString().replaceAll(',', '_');
+            const w = getValue('w');
+            let modelName = 'modified_modified_mobilenetv2-12-f16-o-conv5only' + shapeStr;
+            if (w!=0) {
+                modelName = modelName + '_'+w.toString();
+            }
             const modelPath = './models/' + modelName + '.onnx';
             session = await ort.InferenceSession.create(modelPath, option);
 
