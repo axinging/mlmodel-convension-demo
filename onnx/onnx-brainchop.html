@@ -7,13 +7,13 @@
 <body>
     <!-- consume a single file bundle ./node_modules/onnxruntime-web/dist/ort.webgpu.min.js  ./web/dist/ort.webgpu.min.js-->
     <!--script src="./node_modules/onnxruntime-web/dist/ort.webgpu.min.js"></script-->
-    <script src="./web/dist/ort.all.js"></script>
+    <script src="./web_r_nofuse/dist/ort.all.js"></script>
     <script>
         let feedsInfo = [];
         function getFeedInfo(feed, type, data, dims) {
             const warmupTimes = 0;
             const runTimes = 1;
-            for (i = 0; i < warmupTimes + runTimes; i++) 
+            for (i = 0; i < warmupTimes + runTimes; i++) {
                 let typedArray;
                 let typeBytes;
                 if (type === 'bool') {
@@ -94,16 +94,16 @@
                     graphOptimizationLevel: 'extended',
                     optimizedModelFilepath: 'opt.onnx'
                 };
-                // const session = await ort.InferenceSession.create('./brainchop/model_5_channels.onnx', option);
-                const session = await ort.InferenceSession.create('./brainchop/size64/model_21_channels.onnx', option);
+                const session = await ort.InferenceSession.create('./brainchop/model_5_channels.onnx', option);
+                //const session = await ort.InferenceSession.create('./brainchop/size64/model_21_channels.onnx', option);
                 // const session = await ort.InferenceSession.create('./brainchop/model_21_channels_104classes.onnx', option);
                 // model_21_channels_104classes
-
-                const shape = [1, 1, 64, 64, 64];
+                const size = 256;
+                const shape = [1, 1, size, size, size];
                 const temp = getFeedInfo("input.1", "float32", 0, shape);
                 //console.log(temp);
                 let dataA = temp[0].get('input.1')[1];
-                // let dataTemp = await loadJSON("./onnx-branchchop-input64.jsonc");
+                let dataTemp = await loadJSON("./onnx-branchchop-input256.jsonc");
                 dataA = dataTemp['data'];
                 const tensorA = new ort.Tensor('float32', dataA, shape);
                 const feeds = { "input.1": tensorA };

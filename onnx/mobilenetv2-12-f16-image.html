@@ -143,11 +143,11 @@
         }
 
         async function dynamicInference(mode) {
-            const testSet = ['crab', 'cat', 'magpie', 'jay', 'axolotl']
+            const testSet = ['crab']
             console.log("mode: " + mode);
             await loadORT(mode);
-            //ort.env.logLevel = 'verbose';
-            //ort.env.debug = true;
+            ort.env.logLevel = 'verbose';
+            ort.env.debug = true;
 
             for (const item of testSet) {
                 await inference(item)

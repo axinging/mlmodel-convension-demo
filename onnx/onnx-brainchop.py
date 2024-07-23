@@ -32,18 +32,20 @@ def dumpAsJson(name, input, inputShape):
 
 def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
     # Create the model and check
-    inputShape = [1, 1, 64, 64, 64]
+    size = 256
+    inputShape = [1, 1, size, size, size]
     outputChannel = 21
     channel = inputShape[1]
     inputChannel = inputShape[1]
+    np.random.seed(0)
     input = (np.random.rand(*tuple(inputShape))*10).astype('f').round(1)
     # Save the model
-    dumpAsJson('onnx-branchchop-input64',input.flatten().tolist(), inputShape)
-    with open('onnx-branchchop-input64.jsonc') as f:
+    dumpAsJson('onnx-branchchop-input'+str(size),input.flatten().tolist(), inputShape)
+    with open('onnx-branchchop-input'+str(size)+'.jsonc') as f:
         inputData = json.load(f)
         #conv3dncdhw
         input = arr = np.array(inputData['data'], dtype='float32').reshape(inputShape)
-        MODEL_NAME = './brainchop/size64/model_21_channels.onnx'
+        MODEL_NAME = './brainchop/model_5_channels.onnx' #'./brainchop/size64/model_21_channels.onnx'
         #onnx.save(m1, MODEL_NAME)
         ort_sess = ort.InferenceSession(MODEL_NAME)
         outputs = ort_sess.run(None, {'input.1': input})
@@ -53,7 +55,7 @@ def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
         ol = outputs[0][0].flatten().tolist()
         print(str(ol[0]) + ", " + str(ol[1])+ ", " + str(ol[2])+ ", " + str(ol[10])+ ", " + str(ol[100])+ ", " + str(ol[1000])+ ", " + str(ol[10000])+ ", " + str(ol[100000])+ ", " + str(ol[300000]))
         print(str(ol[len(ol)- 1])+ ", " + str(ol[len(ol)- 2])+ ", " + str(ol[len(ol)- 10])+ ", " + str(ol[len(ol)- 100])+ ", " + str(ol[len(ol)- 1000])+ ", " + str(ol[len(ol)- 10000])+ ", " + str(ol[len(ol)- 100000])+ ", " + str(ol[len(ol)- 300000]))
-        dumpAsJson('onnx-branchchop-output64',ol, inputShape)
+        dumpAsJson('onnx-branchchop-output'+str(size),ol, inputShape)
 
 
 op = 'Sub'
