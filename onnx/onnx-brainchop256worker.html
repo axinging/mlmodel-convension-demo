@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <title>ONNX Runtime JavaScript examples: Quick Start - Web (using bundler)</title>
+</header>
+
+<body>
+    <!-- consume a single file bundle ./node_modules/onnxruntime-web/dist/ort.webgpu.min.js  ./web/dist/ort.webgpu.min.js-->
+    <!--script src="./node_modules/onnxruntime-web/dist/ort.webgpu.min.js"></script-->
+    <script src="./web/dist/ort.all.js"></script>
+    <script>
+        const myWorker = new Worker("onnx-brainchop256worker.js", { type: "module" });
+
+        myWorker.onmessage = (event) => {
+        console.log(`Worker said : ${event.data}`);
+        };
+
+        myWorker.postMessage("ali");
+
+    </script>
+</body>
+
+</html>
