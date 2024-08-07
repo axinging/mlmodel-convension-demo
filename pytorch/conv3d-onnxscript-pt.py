@@ -16,20 +16,29 @@ import numpy as np
 import numpy as np
 
 
-def dumpAsJson(name, suffix, op, input, inputShape, filter, filterShape, kernel_size, output, outputShape, stride, dilation, padding, useBias, bias, biasShape):
+def dumpCon3dAsJson(name, suffix, op, input, inputShape, filter, filterShape, kernel_size, output, outputShape, stride, dilation, padding, paddingNum, useBias, bias, biasShape, dtype):
     data = {}
     biasStr = ''
+    if dtype == 'f':
+        dtype = 'float32'
+    elif dtype == 'f2':
+        dtype = 'float16'
     if useBias == 1:
         biasStr = ' with bias'
     if (padding.upper() == 'SAME'):
         padding = 'SAME_UPPER'
+    print(type(paddingNum))
+    if (type(paddingNum) == 'tuple'):
+        paddingNum = list(paddingNum)
+    print(type(paddingNum))
     data['name'] = name + biasStr + ', x=' + ''.join(str(inputShape)) + ', f=' + ''.join(
-        str(filterShape)) + ', s='+str(stride) + ', d='+str(dilation) + ', p='+str(padding)
+        str(filterShape)) + ', s='+str(stride) + ', d='+str(dilation) + ', auto_pad='+str(padding) + ', pads='+str(paddingNum)
     data['operator'] = op
     data['attributes'] = [
         {"name": "kernel_shape", "data": kernel_size, "type": "ints"},
         {"name": "auto_pad", "data": padding.upper(), "type": "string"},
         {"name": "strides", "data": [1, 1, 1], "type": "ints"},
+        {"name": "pads", "data": paddingNum, "type": "ints"},
         {"name": "dilations", "data": [1, 1, 1], "type": "ints"}
     ]
     if useBias == 1:
@@ -40,24 +49,24 @@ def dumpAsJson(name, suffix, op, input, inputShape, filter, filterShape, kernel_
                     {
                         "data": input,
                         "dims": inputShape,
-                        "type": "float32"
+                        "type": dtype
                     },
                     {
                         "data": filter,
                         "dims": filterShape,
-                        "type": "float32"
+                        "type": dtype
                     },
                     {
                         "data": bias,
                         "dims": biasShape,
-                        "type": "float32"
+                        "type": dtype
                     }
                 ],
                 "outputs": [
                     {
                         "data": output,
                         "dims": outputShape,
-                        "type": "float32"
+                        "type": dtype
                     }
                 ]
             }
@@ -70,19 +79,19 @@ def dumpAsJson(name, suffix, op, input, inputShape, filter, filterShape, kernel_
                     {
                         "data": input,
                         "dims": inputShape,
-                        "type": "float32"
+                        "type": dtype
                     },
                     {
                         "data": filter,
                         "dims": filterShape,
-                        "type": "float32"
+                        "type": dtype
                     }
                 ],
                 "outputs": [
                     {
                         "data": output,
                         "dims": outputShape,
-                        "type": "float32"
+                        "type": dtype
                     }
                 ]
             }
@@ -95,29 +104,39 @@ def dumpAsJson(name, suffix, op, input, inputShape, filter, filterShape, kernel_
         # print(json_data)
 
 
-inputShape = [1, 3, 4, 4, 4]
-outputChannel = 5
+# Place holder data.
+inputShape = [1, 2, 4, 4, 4]
+outputChannel = 1
 channel = inputShape[1]
 inputChannel = inputShape[1]
-input = (np.random.rand(*tuple(inputShape))*10).astype('f').round(1)
+dtype = 'f2'
+input = (np.random.rand(*tuple(inputShape))*10).astype(dtype).round(1)
+print(input)
 # print(input.flatten())
 # out_channels, in_channels/groups,kernel_size[0],kernel_size[1],kernel_size[2]
 # kernel_size = (inputShape[2], inputShape[3], inputShape[4])
 kernel_size = (1, 1, 1)
 filterShape = [outputChannel, channel,
                kernel_size[0], kernel_size[1], kernel_size[2]]
-outChannel = filterShape[0]
-filter = (np.random.rand(*tuple(filterShape))*10).astype('f').round(1)
+# outChannel = filterShape[0]
+filter = (np.random.rand(*tuple(filterShape))*10).astype(dtype).round(1)
 # print(filter.flatten())
 useBias = 1
-biasShape = [outChannel]
+biasShape = [outputChannel]
 # bias = np.array([0, 0], dtype=np.float32).reshape(biasShape)
-bias = (np.random.rand(*tuple(biasShape))*10).astype('f').round(1)
+# np.float16
+bias = (np.random.rand(*tuple(biasShape))*10).astype(dtype).round(1)
 # kernel_size = (filterShape[2], filterShape[3],filterShape[4])
 stride = 1
 dilation = 1
-padding = 'same'
+padding = 'NOTSET'
 paddingOX = padding
+paddingPT = padding
+paddingNumOX = [2, 2, 2, 2, 2, 2]
+paddingNumPT = (2, 2, 2)
+# paddingNumOX = [1, 1, 1, 1, 1, 1]
+# paddingNumPT = (1, 1, 1)
+
 if (padding.upper() == 'SAME'):
     paddingOX = 'SAME_UPPER'
 
@@ -129,20 +148,33 @@ def Conv(X, w, bias):
     return op.Conv(X, w, bias, auto_pad=paddingOX, dilations=[dilation, dilation, dilation], group=1, kernel_shape=kernel_size)
 
 
+@script()
+def ConvPadNumber(X, w, bias):
+    """Hardmax is similar to ArgMax, with the result being encoded OneHot style."""
+    # print(padding)
+    return op.Conv(X, w, bias, auto_pad='NOTSET', dilations=[dilation, dilation, dilation], group=1, kernel_shape=kernel_size, pads=paddingNumOX)
+
+
 def ConvOne(v, w, bias):
-    result1 = Conv(v, w, bias)
+    result1 = Conv(v, w, bias) if (
+        padding != 'NOTSET') else ConvPadNumber(v, w, bias)
     # print(*result1.flatten(),sep=', ')
     return result1
 
 
 def runPytorch():
     # NCDHW
-    m = nn.Conv3d(inputChannel, outChannel, kernel_size,
-                  stride=stride, dilation=dilation, padding=padding)
+    # 20 if someBoolValue else num1
+    m = nn.Conv3d(inputChannel, outputChannel, kernel_size, stride=stride, dilation=dilation, padding=paddingPT) if (
+        padding != 'NOTSET') else nn.Conv3d(inputChannel, outputChannel, kernel_size, stride=stride, dilation=dilation, padding=paddingNumPT)
     m.bias = torch.nn.Parameter(
-        torch.from_numpy(bias).float().reshape(biasShape))
+        torch.from_numpy(bias).reshape(biasShape))
+    if dtype == 'f2':
+        m.bias.to(torch.float16)
     m.weight = nn.Parameter(torch.from_numpy(
-        filter).float().reshape(filterShape))
+        filter).reshape(filterShape))
+    if dtype == 'f2':
+        m.weight.to(torch.float16)
     # NCDHW
     # m = m.to(memory_format=torch.channels_last_3d)
     # non-square kernels and unequal stride and with padding
@@ -152,13 +184,13 @@ def runPytorch():
     print(inputT.shape)
     with torch.no_grad():
         output = m(inputT)
-    print("Conv in ONNX:")
-    print(type(output))  # outShape = [1, 2, 1, 1, 1]
+    # print("Conv in PT:")
+    # print(type(output))  # outShape = [1, 2, 1, 1, 1]
     # print((output.flatten()))
 
-    dumpAsJson('conv3d', 'pt', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
-               output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), useBias, bias.flatten().tolist(), biasShape)
-    # dumpAsJson('conv3d', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size, output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), None, biasShape)
+    dumpCon3dAsJson('conv3d', 'pt', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
+                    output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), paddingNumPT, useBias, bias.flatten().tolist(), biasShape, dtype)
+    # dumpCon3dAsJson('conv3d', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size, output.flatten().tolist(), output.shape, stride, dilation, padding.upper(), None, biasShape)
     return torch.Tensor.numpy(output)
 
 
@@ -167,8 +199,8 @@ def runOnnxScript():
     print("Conv in ONNX nnn:")
     print(type(output))
     print(output.shape)
-    dumpAsJson('conv3d', 'ox', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
-               output.flatten().tolist(), output.shape, stride, dilation, paddingOX.upper(), useBias, bias.flatten().tolist(), biasShape)
+    dumpCon3dAsJson('conv3d', 'ox', 'Conv', input.flatten().tolist(), inputShape, filter.flatten().tolist(), filterShape, kernel_size,
+                    output.flatten().tolist(), output.shape, stride, dilation, paddingOX.upper(), paddingNumOX, useBias, bias.flatten().tolist(), biasShape, dtype)
     return output
 
 

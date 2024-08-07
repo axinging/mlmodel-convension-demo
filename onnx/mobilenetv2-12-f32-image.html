@@ -98,6 +98,7 @@
             //const modelName = 'mobilenetv2-12'
             const modelPath = './models/' + modelName + '.onnx';
             session = await ort.InferenceSession.create(modelPath, option);
+            console.log(await session.handler.loadModel(modelPath));
 
             let feeds = { input: tensor };
             const result = await session.run(feeds);

@@ -1474,6 +1474,7 @@ def parity_check_gqa_past(
     rtol=1e-3,
     atol=1e-3,
 ):
+    torch.manual_seed(69)
     q = torch.randn(
         config.batch_size,
         config.sequence_length,
@@ -1570,8 +1571,11 @@ def parity_check_gqa_past(
     update_mask = torch.logical_and(
         cache_seqlens_expanded <= arange, arange < cache_seqlens_expanded + config.sequence_length
     )
-    print('update_mask ' + str(update_mask))
-    k_cache_ref[update_mask] = rearrange(k_ro, "b s ... -> (b s) ...")
+    print('update_mask in gqa past' + str(update_mask))
+    temp = rearrange(k_ro, "b s ... -> (b s) ...")
+    print(temp)
+    k_cache_ref[update_mask] = temp #rearrange(k_ro, "b s ... -> (b s) ...")
+    print(k_cache_ref)
     v_cache_ref[update_mask] = rearrange(new_v, "b s ... -> (b s) ...")
     k_cache_rep = repeat(k_cache_ref, "b s h d -> b s (h g) d", g=config.num_heads // config.kv_num_heads)
     v_cache_rep = repeat(v_cache_ref, "b s h d -> b s (h g) d", g=config.num_heads // config.kv_num_heads)
@@ -1780,7 +1784,12 @@ def parity_check_gqa_past_no_buff(
     )
 
     print(' update_mask ' + str(update_mask))
-    k_cache_ref[update_mask] = rearrange(k_ro, "b s ... -> (b s) ...")
+    temp = rearrange(k_ro, "b s ... -> (b s) ...")
+    print('temp shape ' + str(temp.shape))
+    print(temp)
+    k_cache_ref[update_mask] = temp
+    print('k_cache_ref shape ' + str(k_cache_ref.shape))
+    print(k_cache_ref[0][8])
     v_cache_ref[update_mask] = rearrange(new_v, "b s ... -> (b s) ...")
     k_cache_rep = repeat(k_cache_ref, "b s h d -> b s (h g) d", g=config.num_heads // config.kv_num_heads)
     v_cache_rep = repeat(v_cache_ref, "b s h d -> b s (h g) d", g=config.num_heads // config.kv_num_heads)
