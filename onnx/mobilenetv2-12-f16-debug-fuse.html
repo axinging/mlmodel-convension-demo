@@ -39,8 +39,8 @@
                 optimizedModelFilePath: 'opt.onnx'
             };
 
-            const modelName = 'whisper-tiny-decoder';
-            //const modelName = 'mobilenetv2-12'
+            // const modelName = 'whisper-tiny-decoder';
+            const modelName = 'mobilenetv2-12'
             const modelPath = './models/' + modelName + '.onnx';
             session = await ort.InferenceSession.create(modelPath, option);
 

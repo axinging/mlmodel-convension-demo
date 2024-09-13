@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <title>ONNX Runtime JavaScript examples: Quick Start - Web (using bundler)</title>
+</header>
+
+<body>
+    <canvas id="input-canvas" , width=224, height=224></canvas>
+    <script src="./web_edit_whisper/dist/ort.all.js"></script>
+    <script src="./imagenet_classes.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script>
+
+        function runPyScript(input) {
+            var jqXHR = $.ajax({
+                type: "POST",
+                url: "http://127.0.0.1:5000/login",
+                async: false,
+                data: { name: input }
+            });
+
+            return jqXHR.responseText;
+        }
+        //models.js globals.
+        let feedsInfo = [];
+        let session;
+        let warmupTimes = 1;
+        let runTimes = 0;
+        //ort.env.logLevel = 'verbose';
+        //ort.env.debug = true;
+        async function run(modelName, enableGraphCapture) {
+
+            const buffer = new ArrayBuffer(8);
+            const bigint64 = new BigInt64Array(buffer);
+            bigint64[0] = 1n;
+            const tensor = new ort.Tensor("int64", bigint64, [1, 1]);
+
+            // set option
+            const option = {
+                executionProviders: [
+                    {
+                        name: 'webgpu',
+                    },
+                ],
+                graphOptimizationLevel: 'disabled',
+                optimizedModelFilePath1: 'opt.onnx'
+            };
+
+            option.enableGraphCapture = enableGraphCapture;
+            // mobilenetv2-12-f16
+            //const modelName = 'mobilenetv2-12';
+            const modelPath = './models/' + modelName + '.onnx';
+
+            // const res = runPyScript(modelPath);
+            //console.log(res);
+            session = await ort.InferenceSession.create(modelPath, option);
+            // console.log(await session.handler.loadModel(modelPath));
+            let webgpuInputBuffer;
+            let feedsTensor = null;
+            let webgpuDevice = ort.env.webgpu.device;
+            let data = bigint64;
+            if (enableGraphCapture) {
+                let bufferSize = 16;
+                let dims = [1, 1];
+                let type = "int64";
+                webgpuInputBuffer = webgpuDevice.createBuffer({
+                    size: bufferSize,
+                    usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+                });
+
+                webgpuDevice.queue.writeBuffer(webgpuInputBuffer, 0, data);
+                feedsTensor = ort.Tensor.fromGpuBuffer(webgpuInputBuffer, { dataType: type, dims });
+            }
+            let feeds = { input_ids: enableGraphCapture ? feedsTensor : tensor };
+            const result = await session.run(feeds);
+            //const predicted = softmax((result.output.data));
+            //const label = getClass(predicted).toString();
+            if (enableGraphCapture) {
+                //console.log(await result['/model/decoder/embed_tokens/Gather_output_0'].getData());
+                return await result['/model/decoder/embed_tokens/Gather_output_0'].getData();
+            } else {
+                return result['/model/decoder/embed_tokens/Gather_output_0'].cpuData;
+            }
+            //console.log(result['/model/decoder/embed_tokens/Gather_output_0'].cpuData);
+        }
+        function arraysEqual(a1, a2) {
+            /* WARNING: arrays must not contain {objects} or behavior may be undefined */
+            return JSON.stringify(a1) == JSON.stringify(a2);
+        }
+        async function main() {
+            let modelName = 'modified_modified_modified_whisper-tiny-decoder-no-edit';
+            const res1 = await run(modelName, false);
+            modelName = 'modified_modified_modified_whisper-tiny-decoder-edit';
+            const res2 = await run(modelName, true);
+            console.log(arraysEqual(res1, res2));
+        }
+        main();
+    </script>
+</body>
+
+</html>
