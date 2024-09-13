@@ -30,8 +30,8 @@ def buildAndRunBinaryGraph():
                            [helper.make_tensor_value_info('data', DATA_TYPE, [1, 3*12, 4, 1])],
                            [helper.make_tensor_value_info('output', DATA_TYPE, [1, 4, 3*12, 1])])
     # Create the model and check
-    m1 = helper.make_model(g1, producer_name='onnxtranspose-demo')
-    m1.ir_version = 9
+    m1 = helper.make_model(graph = g1, producer_name='onnxtranspose-demo', opset_imports=[helper.make_operatorsetid("ai.onnx", 9)])
+    m1.ir_version = 3
     #onnx.checker.check_model(m1)
     # Save the model
     MODEL_NAME = op+'_'+ comment +'.onnx'
