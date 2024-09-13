@@ -11,19 +11,24 @@ from onnx import TensorProto as tp
 import numpy as np
 
 
+data  = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                           1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                           1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                           1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 def buildAndRunBinaryGraph():
     op = 'Transpose'
     DATA_TYPE = tp.FLOAT
     comment = 'float'
 
-    t1 =  np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).reshape((1, 3, 4, 1)).astype(np.float32)
+    #t1 =  np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).reshape((1, 3, 4, 1)).astype(np.float32)
+    t1 =  np.array(data).reshape((1, 3*12, 4, 1)).astype(np.float32)
     # The functional nodes:
     n1 = helper.make_node(op, inputs=['data'], outputs=['output'], name='n1')
     n1.attribute.extend([helper.make_attribute("perm", [0,2,1,3])])
     # Create the graph
     g1 = helper.make_graph([n1], 'preprocessing',
-                           [helper.make_tensor_value_info('data', DATA_TYPE, [1, 3, 4, 1])],
-                           [helper.make_tensor_value_info('output', DATA_TYPE, [1, 4, 3, 1])])
+                           [helper.make_tensor_value_info('data', DATA_TYPE, [1, 3*12, 4, 1])],
+                           [helper.make_tensor_value_info('output', DATA_TYPE, [1, 4, 3*12, 1])])
     # Create the model and check
     m1 = helper.make_model(g1, producer_name='onnxtranspose-demo')
     m1.ir_version = 9
@@ -39,7 +44,8 @@ def buildAndRunBinaryGraph():
 
 
 inputs = {}
-inputs['data'] = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).reshape((1, 3, 4, 1)).astype(np.float32)
+#inputs['data'] = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).reshape((1, 3, 4, 1)).astype(np.float32)
+inputs['data'] = np.array(data).reshape((1, 3*12, 4, 1)).astype(np.float32)
 
 model_path = buildAndRunBinaryGraph()
 print(model_path)
@@ -48,4 +54,4 @@ ort_test_dir_utils.create_test_dir(model_path, 'temp/'+ patht, '', name_input_ma
 
 # can easily dump the input and output to visually check it's as expected
 onnx_test_data_utils.dump_pb('temp/'+patht+'/test_data_set_0')
-#os.rename('temp/'+patht + '/op_test_generated_model_Where_with_no_attributes.onnx','temp/test_where_broadcasetfail/model.onnx')
+os.rename('temp/'+patht + '/'+model_path,'temp/'+patht +'/model.onnx')
