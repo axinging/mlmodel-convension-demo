@@ -48,9 +48,9 @@
         }
         async function loadORT(mode) {
             let urls = mode == "nofuse" ? [
-                './web_f16_outopt_empty/dist/ort.all.js',
+                './web_f16_outopt_1/dist/ort.all.js',
             ] : [
-                './web_f16_outopt_11/dist/ort.all.js',
+                './web_f16_outopt_1_11/dist/ort.all.js',
             ];
             console.log(urls);
             for (let url of urls) {
@@ -118,11 +118,11 @@
                         name: 'webgpu',
                     },
                 ],
-                graphOptimizationLevel: 'all',
+                graphOptimizationLevel: 'extended',
                 optimizedModelFilePath: 'opt.onnx'
             };
 
-            const modelName = 'mobilenetv2-12-f16-v12';
+            const modelName = 'mobilenetv2-12-f16';
             const modelPath = './models/' + modelName + '.onnx';
             session = await ort.InferenceSession.create(modelPath, option);
 
