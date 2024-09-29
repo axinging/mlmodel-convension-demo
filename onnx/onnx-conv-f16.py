@@ -99,7 +99,7 @@ def buildAndRunBinaryGraph(op, DATA_TYPE, comment):
 
     MODEL_NAME = 'Conv_' + type(DATA_TYPE).__name__ +'_'+ comment +'.onnx'
     onnx.save(original_model, MODEL_NAME)
-    ort_sess = ort.InferenceSession(MODEL_NAME)
+    ort_sess = ort.InferenceSession(MODEL_NAME, providers=["CPUExecutionProvider"])
     #outputs = ort_sess.run(None, {'a': t1, 'b': t2})
     # Print Result
     #print(type(DATA_TYPE).__name__, outputs[0])
