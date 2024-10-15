@@ -118,6 +118,10 @@ VERSION = 11
 MODEL_NAME = 'conv_simple'
 buildAndRunBinaryGraph(MODEL_NAME+str(VERSION), VERSION)
 
+VERSION = 12
+MODEL_NAME = 'conv_simple'
+buildAndRunBinaryGraph(MODEL_NAME+str(VERSION), VERSION)
+
 VERSION = 21
 MODEL_NAME = 'conv_simple'
 buildAndRunBinaryGraph(MODEL_NAME+str(VERSION), VERSION)
