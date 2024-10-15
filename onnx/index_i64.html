@@ -21,23 +21,18 @@
 
             return jqXHR.responseText;
         }
-        //models.js globals.
         let feedsInfo = [];
         let session;
         let warmupTimes = 1;
         let runTimes = 0;
         //ort.env.logLevel = 'verbose';
         //ort.env.debug = true;
-        async function run(modelName, enableGraphCapture) {
+        async function run(modelName, ep = 'webgpu', enableGraphCapture = false) {
             let batch_size = 1;
             let sequence_length = 128;
-            const buffer = new ArrayBuffer(8*sequence_length);
+            const buffer = new ArrayBuffer(8 * sequence_length);
             const bigint64 = new BigInt64Array(buffer);
-            // bigint64[0] = 1n;
-            for (let i =0; i < batch_size*sequence_length; i ++) {
-                //bigint64[i] = 1n;
-                //console.log(i.toString());
-                //console.log(BigInt(100));
+            for (let i = 0; i < batch_size * sequence_length; i++) {
                 bigint64[i] = BigInt(i);
             }
             const tensor = new ort.Tensor("int64", bigint64, [batch_size, sequence_length]);
@@ -46,28 +41,25 @@
             const option = {
                 executionProviders: [
                     {
-                        name: 'webgpu',
+                        name: ep,
                     },
                 ],
                 graphOptimizationLevel: 'disabled',
-                optimizedModelFilePath: 'opt.onnx'
+                optimizedModelFilePath1: 'opt.onnx'
             };
 
             option.enableGraphCapture = enableGraphCapture;
-            // mobilenetv2-12-f16
-            //const modelName = 'mobilenetv2-12';
             const modelPath = './models/' + modelName + '.onnx';
 
             // const res = runPyScript(modelPath);
-            //console.log(res);
             session = await ort.InferenceSession.create(modelPath, option);
-            // console.log(await session.handler.loadModel(modelPath));
-            let webgpuInputBuffer;
+
             let feedsTensor = null;
-            let webgpuDevice = ort.env.webgpu.device;
-            let data = bigint64;
             if (enableGraphCapture) {
-                let bufferSize = 8*sequence_length;
+                let webgpuInputBuffer;
+                let webgpuDevice = ort.env.webgpu.device;
+                let data = bigint64;
+                let bufferSize = 8 * sequence_length;
                 let dims = [batch_size, sequence_length];
                 let type = "int64";
                 webgpuInputBuffer = webgpuDevice.createBuffer({
@@ -79,24 +71,24 @@
                 feedsTensor = ort.Tensor.fromGpuBuffer(webgpuInputBuffer, { dataType: type, dims });
             }
             let feeds = { attention_mask: enableGraphCapture ? feedsTensor : tensor };
+            const start = performance.now();
             const result = await session.run(feeds);
-            //const predicted = softmax((result.output.data));
-            //const label = getClass(predicted).toString();
+            const time = performance.now() - start;
+            console.log(time);
             if (enableGraphCapture) {
-                //console.log(await result['/model/decoder/embed_tokens/Gather_output_0'].getData());
                 return await result['/albert/Sub_output_0'].getData();
             } else {
                 return result['/albert/Sub_output_0'].cpuData;
             }
-            //console.log(result['/model/decoder/embed_tokens/Gather_output_0'].cpuData);
         }
         function arraysEqual(a1, a2) {
-            /* WARNING: arrays must not contain {objects} or behavior may be undefined */
             return JSON.stringify(a1) == JSON.stringify(a2);
         }
         async function main() {
             let modelName = 'modified_albert-base-v2_1';
-            const res1 = await run(modelName, false);
+            const res2 = await run(modelName, 'wasm');
+            const res1 = await run(modelName, 'webgpu');
+
             // modelName = 'modified_modified_modified_whisper-tiny-decoder-edit';
             //const res2 = await run(modelName, true);
             //console.log(arraysEqual(res1, res2));
